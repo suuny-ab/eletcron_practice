@@ -16,9 +16,6 @@ const createWindow = () => {
   // 直接加载 Vite 开发服务器，不依赖 NODE_ENV
   win.loadURL('http://localhost:5173')
 
-  // 强制打开开发者工具
-  win.webContents.openDevTools()
-
   // 监听加载完成事件
   win.webContents.on('did-finish-load', () => {
     console.log('页面加载完成')
@@ -27,6 +24,11 @@ const createWindow = () => {
   // 监听加载失败事件
   win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
     console.error('页面加载失败:', errorCode, errorDescription)
+  })
+
+  // 监听渲染进程中的错误
+  win.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[渲染进程] ${message}`)
   })
 }
 

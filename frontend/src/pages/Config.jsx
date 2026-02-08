@@ -1,14 +1,15 @@
-import { useState, useEffect } from 'react';
-import { Form, Input, Button, Card, message, Space, Spin, Popconfirm, Typography } from 'antd';
-import { SaveOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
+import { useState, useEffect, useRef } from 'react';
+import { Form, Input, Button, Card, message, Space, Spin, Popconfirm, Typography, Col, Row } from 'antd';
+import { SaveOutlined, DeleteOutlined, ReloadOutlined, SettingOutlined } from '@ant-design/icons';
 import { getConfig, updateConfig, deleteConfig } from '../api/config';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 function ConfigPage() {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [hasConfig, setHasConfig] = useState(false);
+  const hasInitialized = useRef(false);
 
   // 加载配置
   const loadConfig = async () => {
@@ -62,14 +63,16 @@ function ConfigPage() {
 
   // 页面加载时尝试读取配置
   useEffect(() => {
-    loadConfig();
+    if (!hasInitialized.current) {
+      hasInitialized.current = true;
+      loadConfig();
+    }
   }, []);
 
   return (
     <div style={{
-      minHeight: '100vh',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      padding: '20px',
+      height: '100%',
+      padding: '48px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center'
@@ -78,16 +81,34 @@ function ConfigPage() {
         <Card
           style={{
             width: '100%',
-            maxWidth: 600,
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
-            borderRadius: '16px'
+            maxWidth: 560,
+            boxShadow: '0 4px 24px rgba(0, 0, 0, 0.08)',
+            borderRadius: '12px',
+            border: '1px solid #f0f0f0'
           }}
-          title={
-            <Title level={3} style={{ margin: 0, textAlign: 'center' }}>
-              ⚙️ 系统配置
-            </Title>
-          }
         >
+          <div style={{ marginBottom: 32, textAlign: 'center' }}>
+            <div style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: '#fff',
+              border: '1px solid #e8e8e8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 16px',
+            }}>
+              <SettingOutlined style={{ fontSize: 28, color: '#262626' }} />
+            </div>
+            <Title level={3} style={{ margin: 0 }}>
+              系统配置
+            </Title>
+            <Text type="secondary">
+              配置知识库路径和 AI 模型
+            </Text>
+          </div>
+
           <Form
             form={form}
             layout="vertical"
@@ -95,7 +116,7 @@ function ConfigPage() {
             autoComplete="off"
           >
             <Form.Item
-              label="Obsidian Vault 路径"
+              label={<Text strong>Obsidian Vault 路径</Text>}
               name="obsidian_vault_path"
               rules={[
                 { required: true, message: '请输入 Obsidian Vault 路径' }
@@ -103,13 +124,13 @@ function ConfigPage() {
             >
               <Input
                 placeholder="例如: C:\\Users\\XXX\\Documents\\Obsidian Vault"
-                prefix="📁"
                 size="large"
+                style={{ borderRadius: 8 }}
               />
             </Form.Item>
 
             <Form.Item
-              label="API Key"
+              label={<Text strong>API Key</Text>}
               name="api_key"
               rules={[
                 { required: true, message: '请输入 API Key' }
@@ -117,13 +138,13 @@ function ConfigPage() {
             >
               <Input.Password
                 placeholder="请输入 API Key"
-                prefix="🔑"
                 size="large"
+                style={{ borderRadius: 8 }}
               />
             </Form.Item>
 
             <Form.Item
-              label="模型名称"
+              label={<Text strong>模型名称</Text>}
               name="model_name"
               rules={[
                 { required: true, message: '请输入模型名称' }
@@ -131,68 +152,73 @@ function ConfigPage() {
             >
               <Input
                 placeholder="例如: qwen3-max"
-                prefix="🤖"
                 size="large"
+                style={{ borderRadius: 8 }}
               />
             </Form.Item>
 
-            <Form.Item style={{ marginTop: 24 }}>
-              <Space style={{ width: '100%', justifyContent: 'center' }} size="middle">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  icon={<SaveOutlined />}
-                  size="large"
-                  style={{
-                    minWidth: 120,
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    border: 'none',
-                    borderRadius: '8px',
-                    height: 45,
-                    fontSize: 16
-                  }}
-                >
-                  {hasConfig ? '更新配置' : '保存配置'}
-                </Button>
-
-                {hasConfig && (
-                  <Popconfirm
-                    title="确认删除"
-                    description="确定要删除配置吗？"
-                    onConfirm={handleDelete}
-                    okText="确定"
-                    cancelText="取消"
+            <Form.Item style={{ marginTop: 32 }}>
+              <Row gutter={16}>
+                <Col span={hasConfig ? 8 : 24}>
+                  <Button
+                    htmlType="submit"
+                    icon={<SaveOutlined />}
+                    size="large"
+                    block
+                    style={{
+                      background: '#fff',
+                      border: '1px solid #d9d9d9',
+                      borderRadius: 8,
+                      height: 42,
+                      fontSize: 15
+                    }}
                   >
-                    <Button
-                      danger
-                      icon={<DeleteOutlined />}
-                      size="large"
-                      style={{
-                        minWidth: 120,
-                        borderRadius: '8px',
-                        height: 45,
-                        fontSize: 16
-                      }}
-                    >
-                      删除配置
-                    </Button>
-                  </Popconfirm>
+                    {hasConfig ? '更新配置' : '保存配置'}
+                  </Button>
+                </Col>
+                {hasConfig && (
+                  <>
+                    <Col span={8}>
+                      <Popconfirm
+                        title="确认删除"
+                        description="确定要删除配置吗？"
+                        onConfirm={handleDelete}
+                        okText="确定"
+                        cancelText="取消"
+                      >
+                        <Button
+                          danger
+                          icon={<DeleteOutlined />}
+                          size="large"
+                          block
+                          style={{
+                            borderRadius: 8,
+                            height: 42,
+                            fontSize: 15
+                          }}
+                        >
+                          删除配置
+                        </Button>
+                      </Popconfirm>
+                    </Col>
+                    <Col span={8}>
+                      <Button
+                        icon={<ReloadOutlined />}
+                        size="large"
+                        block
+                        onClick={loadConfig}
+                        style={{
+                          borderRadius: 8,
+                          height: 42,
+                          fontSize: 15
+                        }}
+                      >
+                        刷新
+                      </Button>
+                    </Col>
+                  </>
                 )}
-
-                <Button
-                  icon={<ReloadOutlined />}
-                  size="large"
-                  onClick={loadConfig}
-                  style={{
-                    minWidth: 120,
-                    borderRadius: '8px',
-                    height: 45,
-                    fontSize: 16
-                  }}
-                >
-                  刷新
-                </Button>
-              </Space>
+              </Row>
             </Form.Item>
           </Form>
         </Card>

@@ -91,6 +91,19 @@ class ConfigData(BaseModel):
     model_name: str
 
 
+class FileTreeNode(BaseModel):
+    """文件树节点"""
+    key: str
+    title: str
+    is_leaf: bool
+    children: Optional[list['FileTreeNode']] = None
+
+
+class FileTreeData(BaseModel):
+    """文件树数据"""
+    tree: list[FileTreeNode]
+
+
 # ==================== 旧模型（保留供参考）====================
 # 以下模型已弃用，请使用 DataResponse[T] + Data
 # 未来版本将删除
