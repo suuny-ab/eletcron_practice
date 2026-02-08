@@ -1,0 +1,17 @@
+# FastAPI 项目依赖
+
+# Web 框架
+fastapi>=0.128.1
+uvicorn[standard]>=0.40.0
+python-multipart>=0.0.22
+
+# 环境变量
+python-dotenv>=1.2.1
+
+# AI 和 LangChain
+langchain>=1.2.8
+langchain-community>=0.4.1
+dashscope>=1.25.11
+
+# 数据验证
+pydantic>=2.12.5

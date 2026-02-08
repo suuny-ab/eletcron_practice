@@ -1,0 +1,8 @@
+"""
+路由层模块
+定义API路由
+"""
+from .file_routes import router as file_router
+from .ai_routes import router as ai_router
+
+__all__ = ['file_router', 'ai_router']
