@@ -38,3 +38,9 @@ class ExternalServiceException(BaseBusinessException):
     """外部服务异常"""
     def __init__(self, message: str, error_code: Optional[str] = None):
         super().__init__(message=message, error_code=error_code, status_code=502)
+
+
+class ConfigError(BaseBusinessException):
+    """配置相关异常"""
+    def __init__(self, message: str, error_code: Optional[str] = None):
+        super().__init__(message=message, error_code=error_code, status_code=500)

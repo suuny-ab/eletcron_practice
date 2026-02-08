@@ -84,6 +84,13 @@ class FileListData(BaseModel):
     files: list[FileListItemData]
 
 
+class ConfigData(BaseModel):
+    """配置数据"""
+    obsidian_vault_path: str
+    api_key: str
+    model_name: str
+
+
 # ==================== 旧模型（保留供参考）====================
 # 以下模型已弃用，请使用 DataResponse[T] + Data
 # 未来版本将删除

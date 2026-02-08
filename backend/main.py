@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 
 # 导入路由模块
-from .routes import file_router, ai_router
+from .routes import file_router, ai_router, config_router
 
 # 导入全局异常处理器
 from .core import register_exception_handlers, get_logger
@@ -21,6 +21,7 @@ logger.info("应用初始化完成")
 # 注册路由
 app.include_router(file_router, tags=["files"])
 app.include_router(ai_router, tags=["AI"])
+app.include_router(config_router, tags=["config"])
 
 
 

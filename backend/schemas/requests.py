@@ -26,3 +26,10 @@ class SaveRequest(BaseModel):
     """保存文件请求模型"""
     filename: str
     content: str
+
+
+class UpdateConfigRequest(BaseModel):
+    """配置更新请求模型"""
+    obsidian_vault_path: str
+    api_key: str
+    model_name: str
