@@ -1,12 +1,33 @@
 const { app, BrowserWindow } = require('electron/main')
+const path = require('path')
 
 const createWindow = () => {
   const win = new BrowserWindow({
-    width: 800,
-    height: 600
+    width: 900,
+    height: 700,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      webSecurity: false
+    }
   })
 
-  win.loadFile('index.html')
+  // 开发环境加载 Vite 开发服务器，生产环境加载构建后的文件
+  // 直接加载 Vite 开发服务器，不依赖 NODE_ENV
+  win.loadURL('http://localhost:5173')
+
+  // 强制打开开发者工具
+  win.webContents.openDevTools()
+
+  // 监听加载完成事件
+  win.webContents.on('did-finish-load', () => {
+    console.log('页面加载完成')
+  })
+
+  // 监听加载失败事件
+  win.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('页面加载失败:', errorCode, errorDescription)
+  })
 }
 
 app.whenReady().then(() => {

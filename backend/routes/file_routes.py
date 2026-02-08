@@ -3,9 +3,7 @@
 处理文件上传、保存、删除等操作
 """
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, UploadFile
 from ..utils import (
     save_uploaded_file, delete_file, save_file
 )
@@ -14,15 +12,6 @@ from ..schemas.responses import DataResponse
 
 # 创建路由器
 router = APIRouter()
-
-# 配置模板目录（templates在项目根目录，相对于backend目录是上一级）
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent.parent.parent / "templates"))
-
-
-@router.get("/", response_class=HTMLResponse)
-async def root(request: Request):
-    """显示文件上传页面"""
-    return templates.TemplateResponse("index.html", {"request": request})
 
 
 @router.post("/upload")
