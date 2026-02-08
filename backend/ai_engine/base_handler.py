@@ -4,7 +4,7 @@ AI处理器基类 - 统一处理所有AI功能
 """
 from typing import final, AsyncGenerator
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
-from .core import get_ai_engine
+from .core import AIEngine
 from .config import PromptConfigFactory
 
 
@@ -20,7 +20,7 @@ class AIProcessor:
             task_type: 任务类型 ('optimize', 'advise', 'edit')
         """
         self.task_type = task_type
-        self.ai_engine = get_ai_engine()
+        self.ai_engine = AIEngine()
         self.config = PromptConfigFactory.get_config(task_type)
         self.template = self._build_template()
 

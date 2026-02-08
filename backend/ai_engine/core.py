@@ -9,6 +9,7 @@ from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from ..core.exceptions import ExternalServiceException
 from ..core import get_logger
+from ..utils.config_manager import config_manager
 
 
 class AIEngine:
@@ -17,23 +18,23 @@ class AIEngine:
     def __init__(self):
         """
         初始化 AI 引擎
-        从环境变量自动获取API Key
+        从配置文件获取API Key和模型名称
         """
-        import os
-        from dotenv import load_dotenv
+        # 从配置文件读取配置
+        config = config_manager.read_config()
+        if not config:
+            raise ExternalServiceException("配置文件不存在，请先配置系统")
 
-        # 加载 .env 文件（从ai_engine目录向上两级到backend目录）
-        env_path = Path(__file__).resolve().parent.parent / ".env"
-        _ = load_dotenv(env_path)
+        api_key = config.api_key
+        model_name = config.model_name or "qwen3-max"
 
-        api_key = os.getenv("DASHSCOPE_API_KEY")
         if not api_key:
-            raise ExternalServiceException("请设置 DASHSCOPE_API_KEY 环境变量")
+            raise ExternalServiceException("API密钥不能为空")
 
         # noinspection PyTypeChecker
         self.chat_model: ChatTongyi = ChatTongyi(
             api_key=api_key,  # pyright: ignore[reportArgumentType]
-            model="qwen3-max"  # 使用通义千问最新模型
+            model=model_name
         )
 
         # 初始化输出解析器
@@ -84,13 +85,3 @@ def get_ai_engine() -> AIEngine:
     if _ai_engine is None:
         _ai_engine = AIEngine()
     return _ai_engine
-
-
-def create_ai_engine() -> AIEngine:
-    """
-    创建新的 AI 引擎实例
-
-    Returns:
-        AIEngine 实例
-    """
-    return AIEngine()

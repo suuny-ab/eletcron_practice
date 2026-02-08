@@ -13,6 +13,7 @@ class AIService:
     def __init__(self):
         """
         初始化AI服务
+        从配置文件自动读取API密钥和模型名称
         """
         self.optimizer = AIProcessor('optimize')
         self.advisor = AIProcessor('advise')
@@ -92,11 +93,13 @@ def get_ai_service() -> AIService:
     return _ai_service
 
 
-def create_ai_service() -> AIService:
+def reload_ai_service() -> AIService:
     """
-    创建新的AI服务实例
+    重新加载AI服务实例（从配置文件读取最新配置）
 
     Returns:
         AIService 实例
     """
-    return AIService()
+    global _ai_service
+    _ai_service = AIService()
+    return _ai_service

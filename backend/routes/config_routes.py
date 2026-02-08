@@ -50,6 +50,10 @@ async def update_config(request: UpdateConfigRequest):
         model_name=request.model_name
     )
 
+    # 重新加载 AI 配置（由工具层负责）
+    from ..services.ai_service import reload_ai_service
+    reload_ai_service()
+
     return DataResponse[ConfigData](
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
