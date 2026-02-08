@@ -1,0 +1,20 @@
+{
+  "name": "test",
+  "version": "1.0.0",
+  "description": "eletcron practice",
+  "homepage": "https://github.com/suuny-ab/eletcron_practice#readme",
+  "bugs": {
+    "url": "https://github.com/suuny-ab/eletcron_practice/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/suuny-ab/eletcron_practice.git"
+  },
+  "license": "ISC",
+  "author": "sunny-ab",
+  "type": "commonjs",
+  "main": "main.js",
+  "scripts": {
+    "test": "https://github.com/suuny-ab/eletcron_practice"
+  }
+}
