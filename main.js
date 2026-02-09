@@ -17,8 +17,14 @@ const createWindow = () => {
 
 
   // 开发环境加载 Vite 开发服务器，生产环境加载构建后的文件
-  // 直接加载 Vite 开发服务器，不依赖 NODE_ENV
-  win.loadURL('http://localhost:5173')
+  const devServerUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173'
+
+  if (app.isPackaged) {
+    win.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'))
+  } else {
+    win.loadURL(devServerUrl)
+  }
+
 
   // 监听加载完成事件
   win.webContents.on('did-finish-load', () => {

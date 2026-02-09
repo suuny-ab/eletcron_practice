@@ -16,10 +16,27 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "build:renderer": "npm --prefix frontend run build",
+    "pack": "npm run build:renderer && electron-builder --dir",
+    "dist": "npm run build:renderer && electron-builder",
     "test": "https://github.com/suuny-ab/eletcron_practice"
   },
   "devDependencies": {
-    "electron": "^40.2.1"
+    "electron": "^40.2.1",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.example.ai-knowledge-assistant",
+    "productName": "AI 知识库助手",
+    "files": [
+      "main.js",
+      "frontend/dist/**/*",
+      "backend/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "build"
+    }
   },
   "dependencies": {
     "react-markdown": "^10.1.0",
