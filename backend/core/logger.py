@@ -8,7 +8,7 @@ from datetime import datetime
 
 
 # 日志目录
-LOG_DIR = Path("logs")
+LOG_DIR = Path(__file__).parent.parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)
 
 

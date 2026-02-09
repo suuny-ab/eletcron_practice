@@ -2,7 +2,8 @@
 AI处理器基类 - 统一处理所有AI功能
 使用配置驱动的方式管理不同任务的提示词
 """
-from typing import final, AsyncGenerator
+from typing import final
+from collections.abc import AsyncGenerator
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from .core import AIEngine
 from .config import PromptConfigFactory

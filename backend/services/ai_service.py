@@ -8,16 +8,29 @@ from ..utils.knowledge_utils import read_file
 
 
 class AIService:
-    """AI服务类，处理排版优化和AI对话的业务逻辑"""
+    """AI服务类，处理排版优化和AI对话的业务逻辑 - 单例模式"""
+    
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
         """
         初始化AI服务
         从配置文件自动读取API密钥和模型名称
         """
-        self.optimizer = AIProcessor('optimize')
-        self.advisor = AIProcessor('advise')
-        self.editor = AIProcessor('edit')
+        if self._initialized:
+            return
+            
+        self.optimizer: AIProcessor = AIProcessor('optimize')
+        self.advisor: AIProcessor = AIProcessor('advise')
+        self.editor: AIProcessor = AIProcessor('edit')
+        
+        self._initialized = True
 
     async def optimize_markdown_layout_stream(self, filename: str):
         """
@@ -31,7 +44,7 @@ class AIService:
         """
         # 读取文件内容（会抛出 NotFoundException）
         file_info = read_file(filename)
-        content = file_info["content"]
+        content = file_info.content
 
         # 调用优化器进行流式处理
         async for chunk in self.optimizer.process_stream(content=content):
@@ -50,7 +63,7 @@ class AIService:
         """
         # 读取文件内容（会抛出 NotFoundException）
         file_info = read_file(filename)
-        content = file_info["content"]
+        content = file_info.content
 
         # 调用建议器进行流式处理
         async for chunk in self.advisor.process_stream(content=content, question=question):
@@ -69,37 +82,21 @@ class AIService:
         """
         # 读取文件内容（会抛出 NotFoundException）
         file_info = read_file(filename)
-        content = file_info["content"]
+        content = file_info.content
 
         # 调用编辑器进行流式处理
         async for chunk in self.editor.process_stream(requirement=requirement, content=content):
             yield chunk  # 返回纯文本，不关心JSON格式
 
 
-# 创建全局AI服务实例
-_ai_service = None
-
-
-def get_ai_service() -> AIService:
-    """
-    获取AI服务实例（单例模式）
-
-    Returns:
-        AIService 实例
-    """
-    global _ai_service
-    if _ai_service is None:
-        _ai_service = AIService()
-    return _ai_service
-
-
 def reload_ai_service() -> AIService:
     """
     重新加载AI服务实例（从配置文件读取最新配置）
-
+    
     Returns:
         AIService 实例
     """
-    global _ai_service
-    _ai_service = AIService()
-    return _ai_service
+    # 重置单例状态
+    AIService._instance = None
+    AIService._initialized = False
+    return AIService()

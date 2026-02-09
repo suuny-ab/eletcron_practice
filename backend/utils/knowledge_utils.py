@@ -3,22 +3,10 @@
 提供对Obsidian Vault知识库的文件操作
 """
 from pathlib import Path
-from typing import TypedDict
 from .config_manager import config_manager
 from ..core.exceptions import NotFoundException, ValidationException
+from ..schemas.responses import FileReadResult, FileWriteResult
 
-
-class FileInfo(TypedDict):
-    """文件信息返回值类型"""
-    success: bool
-    filename: str
-    relative_path: str
-    file_size: int
-
-
-class FileContentInfo(FileInfo):
-    """包含文件内容的返回值类型"""
-    content: str
 
 
 def _get_vault_path() -> Path:
@@ -67,7 +55,7 @@ def get_full_path(relative_path: str) -> Path:
     return file_path
 
 
-def read_file(relative_path: str) -> FileContentInfo:
+def read_file(relative_path: str) -> FileReadResult:
     """
     读取知识库文件内容
 
@@ -101,16 +89,16 @@ def read_file(relative_path: str) -> FileContentInfo:
         except:
             content = ""
 
-    return {
-        "success": True,
-        "filename": file_path.name,
-        "relative_path": relative_path.replace('\\', '/'),
-        "file_size": file_path.stat().st_size,
-        "content": content,
-    }
+    return FileReadResult(
+        success=True,
+        filename=file_path.name,
+        file_size=file_path.stat().st_size,
+        file_path=relative_path.replace('\\', '/'),
+        content=content,
+    )
 
 
-def write_file(relative_path: str, content: str) -> dict:
+def write_file(relative_path: str, content: str) -> FileWriteResult:
     """
     写入知识库文件内容
 
@@ -124,16 +112,15 @@ def write_file(relative_path: str, content: str) -> dict:
     file_path = get_full_path(relative_path)
 
     # 父目录不存在时创建
-    file_path.parent.mkdir(parents=True, exist_ok=True)
+    _ = file_path.parent.mkdir(parents=True, exist_ok=True)
 
     # 写入文件内容
     with open(file_path, 'w', encoding='utf-8') as f:
         f.write(content)
 
-    return {
-        "success": True,
-        "message": "文件写入成功",
-        "filename": file_path.name,
-        "relative_path": relative_path.replace('\\', '/'),
-        "file_size": len(content),
-    }
+    return FileWriteResult(
+        success=True,
+        filename=file_path.name,
+        file_size=len(content),
+        file_path=relative_path.replace('\\', '/'),
+    )

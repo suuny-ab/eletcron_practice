@@ -4,7 +4,7 @@ AI相关路由
 """
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
-from ..services import get_ai_service
+from ..services import AIService
 from ..schemas import ChatRequest, OptimizeRequest, EditRequest
 from ..utils import create_json_stream
 from ..core.exceptions import ValidationException
@@ -13,7 +13,7 @@ from ..core.exceptions import ValidationException
 router = APIRouter(prefix="/ai", tags=["AI"])
 
 # 初始化服务层
-ai_service = get_ai_service()
+ai_service = AIService()
 
 
 @router.post("/optimize")

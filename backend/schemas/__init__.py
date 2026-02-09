@@ -8,18 +8,12 @@ from .responses import (
     BaseResponse,
     DataResponse,
     ErrorResponse,
-    FileUploadData,
-    FileSaveData,
-    FileDeleteData,
-    FileListData,
-    FileListItemData,
-    # 旧模型（保留供参考）
-    FileUploadResponse,
-    FileContentResponse,
-    FileSaveResponse,
-    FileDeleteResponse,
-    FileListItem,
-    FileListResponse
+    ConfigData,
+    FileTreeNode,
+    FileTreeData,
+    FileReadResult,
+    FileWriteResult,
+ 
 )
 from .stream_models import StreamChunk, StreamComplete, StreamError
 
@@ -34,20 +28,14 @@ __all__ = [
     'DataResponse',
     'ErrorResponse',
     # 数据模型
-    'FileUploadData',
-    'FileSaveData',
-    'FileDeleteData',
-    'FileListData',
-    'FileListItemData',
+    'ConfigData',
+    'FileTreeNode',
+    'FileTreeData',
+    'FileReadResult',
+    'FileWriteResult',
     # 流式模型
     'StreamChunk',
     'StreamComplete',
     'StreamError',
-    # 旧模型（保留供参考，未来将删除）
-    'FileUploadResponse',
-    'FileContentResponse',
-    'FileSaveResponse',
-    'FileDeleteResponse',
-    'FileListItem',
-    'FileListResponse'
+
 ]

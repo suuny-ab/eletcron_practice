@@ -3,23 +3,32 @@ AI引擎核心类 - 封装通义千问大模型调用
 提供底层的AI能力，不包含业务逻辑
 """
 from collections.abc import AsyncGenerator
-from pathlib import Path
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 from ..core.exceptions import ExternalServiceException
-from ..core import get_logger
 from ..utils.config_manager import config_manager
 
 
 class AIEngine:
-    """AI 引擎类，封装通义千问大模型调用"""
+    """AI 引擎类，封装通义千问大模型调用 - 单例模式"""
+    
+    _instance = None
+    _initialized = False
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
         """
         初始化 AI 引擎
         从配置文件获取API Key和模型名称
         """
+        if self._initialized:  # 避免重复初始化
+            return
+            
         # 从配置文件读取配置
         config = config_manager.read_config()
         if not config:
@@ -39,6 +48,8 @@ class AIEngine:
 
         # 初始化输出解析器
         self.output_parser: StrOutputParser = StrOutputParser()
+        
+        self._initialized = True
 
     async def stream_generate(self, messages: list[BaseMessage]) -> AsyncGenerator[str, None]:
         """
@@ -68,20 +79,3 @@ class AIEngine:
             # 使用输出解析器后，chunk已经是字符串类型
             if chunk:
                 yield chunk
-
-
-# 创建全局 AI 引擎实例
-_ai_engine = None
-
-
-def get_ai_engine() -> AIEngine:
-    """
-    获取 AI 引擎实例（单例模式）
-
-    Returns:
-        AIEngine 实例
-    """
-    global _ai_engine
-    if _ai_engine is None:
-        _ai_engine = AIEngine()
-    return _ai_engine

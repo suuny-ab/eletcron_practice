@@ -255,13 +255,21 @@ function KnowledgePage() {
   };
 
   // 确认保存 AI 生成的内容
-  const handleConfirmAiResult = () => {
+  const handleConfirmAiResult = async () => {
     if (!selectedFile) return;
 
-    setFileContent(generatedContent);
-    setEditContent(generatedContent);
-    setPreviewMode(false);
-    message.success('已应用 AI 生成的内容');
+    setSaveLoading(true);
+    try {
+      await updateFileContent(selectedFile.key, generatedContent);
+      setFileContent(generatedContent);
+      setEditContent(generatedContent);
+      setPreviewMode(false);
+      message.success('AI 生成的内容已保存到文件');
+    } catch (error) {
+      message.error('保存失败: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setSaveLoading(false);
+    }
   };
 
   // 取消 AI 结果
@@ -602,6 +610,7 @@ function KnowledgePage() {
                   type="primary"
                   icon={<CheckOutlined />}
                   onClick={handleConfirmAiResult}
+                  disabled={aiGenerating || !generatedContent}
                   style={{ flex: 1 }}
                 >
                   确认保存

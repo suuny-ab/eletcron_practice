@@ -2,7 +2,7 @@
 API响应模型 - 定义API接口的响应数据结构
 """
 from pydantic import BaseModel
-from typing import Any, Generic, Optional, TypeVar
+from typing import Generic, TypeVar
 from datetime import datetime
 
 
@@ -45,43 +45,27 @@ class ErrorResponse(BaseModel):
     """统一错误响应模型"""
     success: bool = False
     message: str
-    error_code: Optional[str] = None
+    error_code: str | None = None
     timestamp: str = datetime.now().isoformat()
 
 
 # ==================== 数据模型（只定义数据部分）====================
 
-class FileUploadData(BaseModel):
-    """文件上传数据"""
+class FileReadResult(BaseModel):
+    """文件读取结果"""
+    success: bool
     filename: str
     file_size: int
     file_path: str
+    content: str
 
 
-class FileSaveData(BaseModel):
-    """文件保存数据"""
+class FileWriteResult(BaseModel):
+    """文件写入结果"""
+    success: bool
     filename: str
     file_size: int
     file_path: str
-
-
-class FileDeleteData(BaseModel):
-    """文件删除数据"""
-    filename: str
-    file_path: str
-
-
-class FileListItemData(BaseModel):
-    """文件列表项数据"""
-    filename: str
-    file_size: int
-    file_path: str
-    modified_time: float
-
-
-class FileListData(BaseModel):
-    """文件列表数据"""
-    files: list[FileListItemData]
 
 
 class ConfigData(BaseModel):
@@ -96,56 +80,10 @@ class FileTreeNode(BaseModel):
     key: str
     title: str
     is_leaf: bool
-    children: Optional[list['FileTreeNode']] = None
+    children: list['FileTreeNode'] | None = None
 
 
 class FileTreeData(BaseModel):
     """文件树数据"""
     tree: list[FileTreeNode]
 
-
-# ==================== 旧模型（保留供参考）====================
-# 以下模型已弃用，请使用 DataResponse[T] + Data
-# 未来版本将删除
-
-class FileUploadResponse(BaseModel):
-    """文件上传响应（已弃用，请使用 DataResponse[FileUploadData]）"""
-    filename: str
-    file_size: int
-    file_path: str
-
-
-class FileContentResponse(BaseModel):
-    """包含文件内容的响应（已弃用）"""
-    filename: str
-    file_size: int
-    file_path: str
-    content: str
-
-
-class FileSaveResponse(BaseModel):
-    """文件保存响应（已弃用，请使用 DataResponse[FileSaveData]）"""
-    message: str
-    filename: str
-    file_size: int
-    file_path: str
-
-
-class FileDeleteResponse(BaseModel):
-    """文件删除响应（已弃用，请使用 DataResponse[FileDeleteData]）"""
-    message: str
-    filename: str
-    file_path: str
-
-
-class FileListItem(BaseModel):
-    """文件列表项（已弃用，请使用 FileListItemData）"""
-    filename: str
-    file_size: int
-    file_path: str
-    modified_time: float
-
-
-class FileListResponse(BaseModel):
-    """文件列表响应（已弃用，请使用 DataResponse[FileListData]）"""
-    files: list[FileListItem]

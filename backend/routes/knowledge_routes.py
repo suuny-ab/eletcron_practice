@@ -3,9 +3,12 @@
 处理知识库文件树扫描、文件读取等操作
 """
 from pathlib import Path
+
 from fastapi import APIRouter
 from ..utils.config_manager import config_manager
-from ..schemas.responses import DataResponse, FileTreeData, FileTreeNode
+from ..utils import read_knowledge_file
+from ..utils.knowledge_utils import write_file
+from ..schemas.responses import DataResponse, FileTreeData, FileTreeNode, FileReadResult, FileWriteResult
 from ..schemas.requests import FileUpdateRequest
 from ..core.exceptions import NotFoundException, ValidationException
 
@@ -13,7 +16,7 @@ from ..core.exceptions import NotFoundException, ValidationException
 router = APIRouter(prefix="/knowledge", tags=["知识库"])
 
 
-def _build_file_tree(root_path: Path, relative_path: Path = None) -> list[FileTreeNode]:
+def _build_file_tree(root_path: Path, relative_path: Path | None = None) -> list[FileTreeNode]:
     """
     递归构建文件树
 
@@ -102,7 +105,7 @@ async def get_file_tree():
     )
 
 
-@router.get("/file/{relative_path:path}", response_model=DataResponse[dict])
+@router.get("/file/{relative_path:path}", response_model=DataResponse[FileReadResult])
 async def get_file_content(relative_path: str):
     """
     读取文件内容
@@ -111,53 +114,18 @@ async def get_file_content(relative_path: str):
         relative_path: 相对于知识库根目录的文件路径
 
     Returns:
-        DataResponse[dict]: 包含文件内容的响应
+        DataResponse[FileReadResult]: 包含文件内容的响应
     """
-    # 读取配置
-    config = config_manager.read_config()
-    if not config:
-        raise NotFoundException("请先配置 Obsidian Vault 路径")
-
-    # 构建完整文件路径
-    vault_path = Path(config.obsidian_vault_path)
-    file_path = vault_path / relative_path
-
-    # 安全检查：确保文件在知识库目录内
-    try:
-        file_path.resolve().relative_to(vault_path.resolve())
-    except ValueError:
-        raise ValidationException("无效的文件路径")
-
-    if not file_path.exists():
-        raise NotFoundException(f"文件不存在: {relative_path}")
-
-    if not file_path.is_file():
-        raise ValidationException("路径不是文件")
-
-    # 读取文件内容
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-    except UnicodeDecodeError:
-        # 尝试其他编码
-        try:
-            with open(file_path, 'r', encoding='gbk') as f:
-                content = f.read()
-        except:
-            content = "[二进制文件，无法预览]"
-
-    return DataResponse[dict](
-        data={
-            "relative_path": relative_path.replace('\\', '/'),
-            "filename": file_path.name,
-            "content": content,
-            "size": file_path.stat().st_size
-        },
+    # 使用工具层读取文件，复用已有逻辑
+    file_info = read_knowledge_file(relative_path)
+    
+    return DataResponse[FileReadResult](
+        data=file_info,
         message="文件读取成功"
     )
 
 
-@router.put("/file/{relative_path:path}", response_model=DataResponse[dict])
+@router.put("/file/{relative_path:path}", response_model=DataResponse[FileWriteResult])
 async def update_file_content(relative_path: str, request: FileUpdateRequest):
     """
     更新文件内容
@@ -167,41 +135,12 @@ async def update_file_content(relative_path: str, request: FileUpdateRequest):
         request: 包含更新内容的请求体
 
     Returns:
-        DataResponse[dict]: 包含更新结果的响应
+        DataResponse[FileWriteResult]: 包含更新结果的响应
     """
-    # 读取配置
-    config = config_manager.read_config()
-    if not config:
-        raise NotFoundException("请先配置 Obsidian Vault 路径")
-
-    # 构建完整文件路径
-    vault_path = Path(config.obsidian_vault_path)
-    file_path = vault_path / relative_path
-
-    # 安全检查：确保文件在知识库目录内
-    try:
-        file_path.resolve().relative_to(vault_path.resolve())
-    except ValueError:
-        raise ValidationException("无效的文件路径")
-
-    if not file_path.exists():
-        raise NotFoundException(f"文件不存在: {relative_path}")
-
-    if not file_path.is_file():
-        raise ValidationException("路径不是文件")
-
-    # 写入文件内容
-    try:
-        with open(file_path, 'w', encoding='utf-8') as f:
-            f.write(request.content)
-    except Exception as e:
-        raise ValidationException(f"写入文件失败: {str(e)}")
-
-    return DataResponse[dict](
-        data={
-            "relative_path": relative_path.replace('\\', '/'),
-            "filename": file_path.name,
-            "size": file_path.stat().st_size
-        },
+    # 使用工具层写入文件，复用已有逻辑
+    file_info = write_file(relative_path, request.content)
+    
+    return DataResponse[FileWriteResult](
+        data=file_info,
         message="文件更新成功"
     )

@@ -4,7 +4,6 @@
 """
 import json
 from pathlib import Path
-from typing import Optional
 from pydantic import BaseModel, ValidationError
 
 from ..core.exceptions import ConfigError
@@ -32,7 +31,7 @@ class ConfigManager:
         if not self.config_dir.exists():
             self.config_dir.mkdir(parents=True)
     
-    def read_config(self) -> Optional[ConfigModel]:
+    def read_config(self) -> ConfigModel | None:
         """
         读取配置文件
 

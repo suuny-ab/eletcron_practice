@@ -5,7 +5,7 @@ from fastapi import FastAPI
 
 
 # 导入路由模块
-from .routes import file_router, ai_router, config_router, knowledge_router
+from .routes import ai_router, config_router, knowledge_router
 
 # 导入全局异常处理器
 from .core import register_exception_handlers, get_logger
@@ -32,8 +32,8 @@ async def startup_event():
         if config:
             logger.info(f"已加载配置: Obsidian Vault={config.obsidian_vault_path}, 模型={config.model_name}")
             # 初始化 AI 服务（会在内部读取配置）
-            from .services.ai_service import get_ai_service
-            get_ai_service()
+            from .services.ai_service import AIService
+            AIService()
         else:
             logger.info("未找到配置文件，请在界面中配置")
     except Exception as e:
@@ -43,7 +43,6 @@ async def startup_event():
 
 
 # 注册路由
-app.include_router(file_router, tags=["files"])
 app.include_router(ai_router, tags=["AI"])
 app.include_router(config_router, tags=["config"])
 app.include_router(knowledge_router, tags=["knowledge"])
