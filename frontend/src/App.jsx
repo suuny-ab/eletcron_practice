@@ -1,29 +1,20 @@
-import React, { useState } from 'react';
-import { ConfigProvider, Layout, Menu, Typography, theme } from 'antd';
+import { useState } from 'react';
+import { ConfigProvider, Layout, Typography, Button, Space, Tooltip } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { SettingOutlined, DatabaseOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import ConfigPage from './pages/Config';
+import { VerticalLeftOutlined, VerticalRightOutlined, SettingOutlined, BookOutlined } from '@ant-design/icons';
 import KnowledgePage from './pages/Knowledge';
 
-const { Header, Content } = Layout;
-const { Title, Text } = Typography;
+const { Title } = Typography;
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('config');
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [aiSidebarVisible, setAiSidebarVisible] = useState(false);
+  const [configTabVisible, setConfigTabVisible] = useState(false);
+  const [configTabRequestId, setConfigTabRequestId] = useState(0);
 
-  const {
-    token: { colorBgContainer },
-  } = theme.useToken();
-
-  const renderContent = () => {
-    switch (currentPage) {
-      case 'config':
-        return <ConfigPage />;
-      case 'knowledge':
-        return <KnowledgePage />;
-      default:
-        return <ConfigPage />;
-    }
+  const handleOpenConfigTab = () => {
+    setConfigTabVisible(true);
+    setConfigTabRequestId((prev) => prev + 1);
   };
 
   return (
@@ -34,72 +25,95 @@ function App() {
           colorPrimary: '#667eea',
           borderRadius: 8,
         },
+        motion: true,
+        motionDurationMid: 0.3,
       }}
     >
-      <Layout style={{ height: '100vh', overflow: 'hidden' }}>
-        <Header
-          style={{
-            background: '#fff',
-            padding: '0 32px',
-            display: 'flex',
-            alignItems: 'center',
-            borderBottom: '1px solid #f0f0f0',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-            height: 64,
-            lineHeight: '64px',
-          }}
-        >
+      <Layout style={{ height: '100vh', width: '100vw', margin: 0, padding: 0, overflow: 'hidden', background: '#f5f7fa' }}>
+        <div style={{
+          height: 52,
+          background: '#fff',
+          borderBottom: '1px solid #e8e8e8',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 20px',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
+          margin: 0,
+        }}>
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 16,
-            marginRight: 'auto',
+            gap: 12,
           }}>
-            <ThunderboltOutlined style={{
-              fontSize: 24,
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }} />
-            <Title level={4} style={{ margin: 0, fontWeight: 600 }}>
-              知识库迁移系统
+            <Title level={4} style={{ margin: 0, fontWeight: 600, fontSize: 16 }}>
+              <BookOutlined /> 知识库
             </Title>
           </div>
+          <Space size={8}>
+            <Button
+              type="text"
+              icon={<VerticalLeftOutlined />}
+              onClick={() => setLeftSidebarCollapsed(!leftSidebarCollapsed)}
+              style={{ fontSize: 16, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            />
+            <Button
+              type="text"
+              icon={<VerticalRightOutlined />}
+              onClick={() => setAiSidebarVisible(!aiSidebarVisible)}
+              style={{ fontSize: 16, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            />
+            <Tooltip title="系统配置">
+              <Button
+                type="text"
+                icon={<SettingOutlined />}
+                onClick={handleOpenConfigTab}
+                style={{ fontSize: 16, width: 40, height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              />
+            </Tooltip>
+          </Space>
+        </div>
 
-          <Menu
-            mode="horizontal"
-            selectedKeys={[currentPage]}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              minWidth: 200,
-              lineHeight: '64px',
-            }}
-            items={[
-              {
-                key: 'config',
-                icon: <SettingOutlined />,
-                label: '系统配置',
-                onClick: () => setCurrentPage('config'),
-              },
-              {
-                key: 'knowledge',
-                icon: <DatabaseOutlined />,
-                label: '知识库',
-                onClick: () => setCurrentPage('knowledge'),
-              },
-            ]}
-          />
-        </Header>
-        <Content
-          style={{
-            background: colorBgContainer,
-            height: 'calc(100vh - 64px)',
-            overflow: 'hidden'
-          }}
-        >
-          {renderContent()}
-        </Content>
+        <div style={{
+          marginTop: 52,
+          height: 'calc(100vh - 52px)',
+          overflow: 'hidden',
+          width: '100%',
+          padding: 0,
+        }}>
+          <div style={{
+            animation: 'fadeIn 0.3s ease-in-out',
+            height: '100%',
+          }}>
+            <KnowledgePage
+              leftSidebarCollapsed={leftSidebarCollapsed}
+              setLeftSidebarCollapsed={setLeftSidebarCollapsed}
+              aiSidebarVisible={aiSidebarVisible}
+              setAiSidebarVisible={setAiSidebarVisible}
+              configTabVisible={configTabVisible}
+              onConfigTabClose={() => setConfigTabVisible(false)}
+              configTabRequestId={configTabRequestId}
+            />
+          </div>
+        </div>
+
+        <style jsx global>{`
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(8px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+        `}</style>
       </Layout>
     </ConfigProvider>
   );

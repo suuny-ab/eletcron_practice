@@ -1,16 +1,20 @@
-const { app, BrowserWindow } = require('electron/main')
+const { app, BrowserWindow, Menu } = require('electron/main')
 const path = require('path')
 
 const createWindow = () => {
   const win = new BrowserWindow({
     width: 900,
     height: 700,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false
     }
   })
+
+  win.setMenuBarVisibility(false)
+
 
   // 开发环境加载 Vite 开发服务器，生产环境加载构建后的文件
   // 直接加载 Vite 开发服务器，不依赖 NODE_ENV
@@ -33,7 +37,9 @@ const createWindow = () => {
 }
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(null)
   createWindow()
+
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
