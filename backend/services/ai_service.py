@@ -4,7 +4,7 @@ AI服务层 - 编排排版优化、AI建议等业务逻辑
 """
 
 from ..ai_engine import AIProcessor
-from ..utils import read_file
+from ..utils.knowledge_utils import read_file
 
 
 class AIService:

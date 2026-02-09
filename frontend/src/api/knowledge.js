@@ -28,3 +28,13 @@ export const getFileContent = async (relativePath) => {
   const response = await apiClient.get(`/knowledge/file/${relativePath}`);
   return response.data;
 };
+
+/**
+ * 更新文件内容
+ * @param {string} relativePath - 相对路径
+ * @param {string} content - 新内容
+ */
+export const updateFileContent = async (relativePath, content) => {
+  const response = await apiClient.put(`/knowledge/file/${relativePath}`, { content });
+  return response.data;
+};

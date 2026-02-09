@@ -33,3 +33,8 @@ class UpdateConfigRequest(BaseModel):
     obsidian_vault_path: str
     api_key: str
     model_name: str
+
+
+class FileUpdateRequest(BaseModel):
+    """文件更新请求模型"""
+    content: str

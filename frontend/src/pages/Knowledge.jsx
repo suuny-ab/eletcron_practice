@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { Tree, Card, message, Spin, Typography, Empty, Layout, Button, Space, Tag } from 'antd';
-import { FolderOutlined, FileOutlined, ReloadOutlined, BookOutlined, FolderOpenOutlined } from '@ant-design/icons';
-import { getFileTree } from '../api/knowledge';
+import { Tree, Card, message, Spin, Typography, Empty, Layout, Button, Space, Tag, Modal, Input, Radio } from 'antd';
+import { FolderOutlined, FileOutlined, ReloadOutlined, BookOutlined, FolderOpenOutlined, EditOutlined, CheckOutlined, CloseOutlined, RightOutlined, LeftOutlined, SendOutlined, BgColorsOutlined, EditOutlined as EditOutlined2, ThunderboltOutlined } from '@ant-design/icons';
+import { getFileTree, getFileContent, updateFileContent } from '../api/knowledge';
+import { aiAdvise, aiEdit, aiOptimize, readStream } from '../api/ai';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
-import 'highlight.js/styles/github-dark.css';
+import 'highlight.js/styles/github.css';
 
 const { DirectoryTree } = Tree;
 const { Title, Text, Paragraph } = Typography;
 const { Sider, Content } = Layout;
+const { TextArea } = Input;
 
 function KnowledgePage() {
   const [treeData, setTreeData] = useState([]);
@@ -20,6 +22,19 @@ function KnowledgePage() {
   const [contentLoading, setContentLoading] = useState(false);
   const hasInitialized = useRef(false);
   const [expandedKeys, setExpandedKeys] = useState([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  // AI 侧边栏状态
+  const [aiSidebarVisible, setAiSidebarVisible] = useState(false);
+  const [aiMode, setAiMode] = useState('advise'); // 'advise' | 'edit'
+  const [chatMessages, setChatMessages] = useState([]);
+  const [userInput, setUserInput] = useState('');
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
+  const [originalContent, setOriginalContent] = useState('');
+  const [generatedContent, setGeneratedContent] = useState('');
 
   // 切换展开/收起
   const toggleExpand = () => {
@@ -81,16 +96,179 @@ function KnowledgePage() {
 
       setSelectedFile(node);
       setContentLoading(true);
+      setIsEditing(false);
       try {
-        const { getFileContent } = await import('../api/knowledge');
         const response = await getFileContent(node.key);
-        setFileContent(response.data.content);
+        const content = response.data?.content || '';
+        setFileContent(content);
+        setEditContent(content);
       } catch (error) {
         message.error('读取文件失败: ' + (error.response?.data?.message || error.message));
       } finally {
         setContentLoading(false);
       }
     }
+  };
+
+  // 开始编辑
+  const handleStartEdit = () => {
+    setEditContent(fileContent);
+    setIsEditing(true);
+  };
+
+  // 取消编辑
+  const handleCancelEdit = () => {
+    setEditContent(fileContent);
+    setIsEditing(false);
+  };
+
+  // 保存编辑
+  const handleSave = async () => {
+    if (!selectedFile) return;
+
+    setSaveLoading(true);
+    try {
+      await updateFileContent(selectedFile.key, editContent);
+      setFileContent(editContent);
+      setIsEditing(false);
+      message.success('文件保存成功');
+    } catch (error) {
+      message.error('保存失败: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setSaveLoading(false);
+    }
+  };
+
+  // AI 消息发送
+  const handleSendAiMessage = async () => {
+    if (!userInput.trim() || !selectedFile) {
+      message.warning('请输入问题并选择文件');
+      return;
+    }
+
+    // AI编辑模式：切换到预览模式
+    if (aiMode === 'edit') {
+      setPreviewMode(true);
+      setOriginalContent(fileContent);
+      setGeneratedContent('');
+      setAiGenerating(true);
+
+      try {
+        const stream = await aiEdit(selectedFile.key, userInput);
+
+        // 流式读取响应
+        for await (const chunk of readStream(stream)) {
+          console.log('[handleSendAiMessage] Received chunk:', chunk);
+          setGeneratedContent(prev => {
+            const newContent = prev + chunk;
+            console.log('[handleSendAiMessage] Generated content length:', newContent.length);
+            return newContent;
+          });
+        }
+        console.log('[handleSendAiMessage] Stream finished');
+      } catch (error) {
+        console.error('[handleSendAiMessage] Error:', error);
+        message.error('AI 编辑失败: ' + error.message);
+        setPreviewMode(false);
+        setOriginalContent('');
+        setGeneratedContent('');
+      } finally {
+        console.log('[handleSendAiMessage] Finally block, setting aiGenerating to false');
+        setAiGenerating(false);
+      }
+      return;
+    }
+
+    // AI建议模式：在对话中显示
+    const newMessage = { role: 'user', content: userInput };
+    setChatMessages(prev => [...prev, newMessage]);
+    setUserInput('');
+    setAiGenerating(true);
+
+    try {
+      const stream = await aiAdvise(selectedFile.key, userInput);
+
+      // 先添加一个空的AI响应消息
+      setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+      // 流式读取响应
+      for await (const chunk of readStream(stream)) {
+        setChatMessages(prev => {
+          const newMessages = [...prev];
+          const lastIndex = newMessages.length - 1;
+          // 创建新对象，避免引用问题
+          newMessages[lastIndex] = {
+            ...newMessages[lastIndex],
+            content: newMessages[lastIndex].content + chunk
+          };
+          return newMessages;
+        });
+      }
+    } catch (error) {
+      message.error('AI 请求失败: ' + error.message);
+      setChatMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `错误：${error.message}`
+      }]);
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  // 一键排版
+  const handleOneClickOptimize = async () => {
+    if (!selectedFile) {
+      message.warning('请先选择文件');
+      return;
+    }
+
+    console.log('[handleOneClickOptimize] Starting optimization for file:', selectedFile.key);
+    setPreviewMode(true);
+    setOriginalContent(fileContent);
+    setGeneratedContent('');
+    setAiGenerating(true);
+
+    try {
+      const stream = await aiOptimize(selectedFile.key);
+      console.log('[handleOneClickOptimize] Stream received');
+
+      // 流式读取响应
+      for await (const chunk of readStream(stream)) {
+        console.log('[handleOneClickOptimize] Received chunk:', chunk);
+        setGeneratedContent(prev => {
+          const newContent = prev + chunk;
+          console.log('[handleOneClickOptimize] Generated content length:', newContent.length);
+          return newContent;
+        });
+      }
+      console.log('[handleOneClickOptimize] Stream finished');
+    } catch (error) {
+      console.error('[handleOneClickOptimize] Error:', error);
+      message.error('排版失败: ' + error.message);
+      setPreviewMode(false);
+      setOriginalContent('');
+      setGeneratedContent('');
+    } finally {
+      console.log('[handleOneClickOptimize] Finally block, setting aiGenerating to false');
+      setAiGenerating(false);
+    }
+  };
+
+  // 确认保存 AI 生成的内容
+  const handleConfirmAiResult = () => {
+    if (!selectedFile) return;
+
+    setFileContent(generatedContent);
+    setEditContent(generatedContent);
+    setPreviewMode(false);
+    message.success('已应用 AI 生成的内容');
+  };
+
+  // 取消 AI 结果
+  const handleCancelAiResult = () => {
+    setPreviewMode(false);
+    setOriginalContent('');
+    setGeneratedContent('');
   };
 
   return (
@@ -170,6 +348,26 @@ function KnowledgePage() {
               </Space>
             )
           }
+          extra={
+            <Space>
+              {selectedFile && !isEditing && (
+                <Button
+                  type="text"
+                  icon={<EditOutlined />}
+                  onClick={handleStartEdit}
+                >
+                  编辑
+                </Button>
+              )}
+              <Button
+                type="text"
+                icon={aiSidebarVisible ? <RightOutlined /> : <LeftOutlined />}
+                onClick={() => setAiSidebarVisible(!aiSidebarVisible)}
+              >
+                AI
+              </Button>
+            </Space>
+          }
           bordered={false}
           style={{
             height: '100%',
@@ -182,20 +380,154 @@ function KnowledgePage() {
             overflow: 'auto',
           }}
         >
-          <Spin spinning={contentLoading}>
+          <Spin spinning={contentLoading || saveLoading}>
             {fileContent ? (
+              isEditing ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%' }}>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                    <Button icon={<CloseOutlined />} onClick={handleCancelEdit}>
+                      取消
+                    </Button>
+                    <Button type="primary" icon={<CheckOutlined />} onClick={handleSave}>
+                      保存
+                    </Button>
+                  </div>
+                  <TextArea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    style={{
+                      fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                      fontSize: 14,
+                      lineHeight: 1.6,
+                      height: 'calc(100vh - 250px)',
+                      minHeight: '500px',
+                    }}
+                    placeholder="输入 Markdown 内容..."
+                  />
+                </div>
+              ) : (
+                <div style={{
+                  padding: '20px',
+                  backgroundColor: '#fff',
+                  borderRadius: '8px',
+                }}>
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                    components={{
+                      h1: ({ children }) => <h1 style={{ fontSize: '2em', fontWeight: 'bold', marginTop: '1.5em', marginBottom: '0.8em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' }}>{children}</h1>,
+                      h2: ({ children }) => <h2 style={{ fontSize: '1.5em', fontWeight: 'bold', marginTop: '1.5em', marginBottom: '0.8em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' }}>{children}</h2>,
+                      h3: ({ children }) => <h3 style={{ fontSize: '1.25em', fontWeight: 'bold', marginTop: '1.5em', marginBottom: '0.8em' }}>{children}</h3>,
+                      p: ({ children }) => <p style={{ lineHeight: '1.8', marginBottom: '1em', color: '#24292e' }}>{children}</p>,
+                      ul: ({ children }) => <ul style={{ paddingLeft: '2em', marginBottom: '1em', lineHeight: '1.8' }}>{children}</ul>,
+                      ol: ({ children }) => <ol style={{ paddingLeft: '2em', marginBottom: '1em', lineHeight: '1.8' }}>{children}</ol>,
+                      li: ({ children }) => <li style={{ marginBottom: '0.5em' }}>{children}</li>,
+                      code: ({ inline, className, children, ...props }) => {
+                        if (inline) {
+                          return <code style={{
+                            backgroundColor: 'rgba(27, 31, 35, 0.05)',
+                            padding: '0.2em 0.4em',
+                            borderRadius: '3px',
+                            fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                            fontSize: '85%'
+                          }} {...props}>{children}</code>;
+                        }
+                        return <code className={className} {...props}>{children}</code>;
+                      },
+                      pre: ({ children }) => <pre style={{
+                        backgroundColor: '#ffffff',
+                        padding: '16px',
+                        borderRadius: '6px',
+                        overflow: 'auto',
+                        marginBottom: '1em',
+                        border: '1px solid #e8e8e8'
+                      }}>{children}</pre>,
+                      blockquote: ({ children }) => <blockquote style={{
+                        borderLeft: '4px solid #dfe2e5',
+                        padding: '0 1em',
+                        color: '#6a737d',
+                        marginLeft: '0',
+                        marginBottom: '1em'
+                      }}>{children}</blockquote>,
+                      table: ({ children }) => <table style={{
+                        width: '100%',
+                        borderCollapse: 'collapse',
+                        marginBottom: '1em'
+                      }}>{children}</table>,
+                      thead: ({ children }) => <thead>{children}</thead>,
+                      tbody: ({ children }) => <tbody>{children}</tbody>,
+                      tr: ({ children }) => <tr style={{ borderBottom: '1px solid #eaecef' }}>{children}</tr>,
+                      th: ({ children }) => <th style={{
+                        padding: '6px 13px',
+                        fontWeight: '600',
+                        borderBottom: '1px solid #dfe2e5',
+                        backgroundColor: '#f6f8fa',
+                        textAlign: 'left'
+                      }}>{children}</th>,
+                      td: ({ children }) => <td style={{
+                        padding: '6px 13px',
+                        borderBottom: '1px solid #eaecef',
+                        textAlign: 'left'
+                      }}>{children}</td>,
+                      a: ({ children, href }) => <a href={href} style={{ color: '#0366d6', textDecoration: 'none' }}>{children}</a>,
+                    }}
+                  >
+                    {fileContent}
+                  </ReactMarkdown>
+                </div>
+              )
+            ) : (
+              <Empty
+                description={
+                  <Space direction="vertical" size="small">
+                    <Paragraph type="secondary">请在左侧文件树中选择文件</Paragraph>
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      仅支持预览和编辑 Markdown 格式文件
+                    </Text>
+                  </Space>
+                }
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                style={{ marginTop: 80 }}
+              />
+            )}
+          </Spin>
+        </Card>
+      </Content>
+
+      {/* AI 侧边栏 */}
+      {aiSidebarVisible && (
+        <Sider
+          width={400}
+          style={{
+            background: '#fff',
+            borderLeft: '1px solid #e8e8e8',
+            boxShadow: '-2px 0 8px rgba(0,0,0,0.06)',
+            overflow: 'hidden',
+          }}
+        >
+          {previewMode ? (
+            /* 预览模式：显示AI编辑后的内容 */
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
               <div style={{
-                padding: '20px',
-                backgroundColor: '#fff',
-                borderRadius: '8px',
+                padding: '16px',
+                borderBottom: '1px solid #f0f0f0',
+                background: '#fafafa',
               }}>
+                <Text strong>AI 排版预览</Text>
+                {aiGenerating && <span style={{ marginLeft: 8, color: '#1890ff' }}>(生成中...)</span>}
+              </div>
+              <div style={{ flex: 1, padding: '16px', overflow: 'auto' }}>
+                <div style={{ fontSize: 12, color: '#999', marginBottom: 8 }}>
+                  内容长度: {generatedContent.length} 字符
+                </div>
                 <ReactMarkdown
+                  key={generatedContent}
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight, rehypeRaw]}
                   components={{
-                    h1: ({ children }) => <h1 style={{ fontSize: '2em', fontWeight: 'bold', marginTop: '1.5em', marginBottom: '0.8em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' }}>{children}</h1>,
-                    h2: ({ children }) => <h2 style={{ fontSize: '1.5em', fontWeight: 'bold', marginTop: '1.5em', marginBottom: '0.8em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' }}>{children}</h2>,
-                    h3: ({ children }) => <h3 style={{ fontSize: '1.25em', fontWeight: 'bold', marginTop: '1.5em', marginBottom: '0.8em' }}>{children}</h3>,
+                    h1: ({ children }) => <h1 style={{ fontSize: '1.8em', fontWeight: 'bold', marginTop: '1.2em', marginBottom: '0.6em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' }}>{children}</h1>,
+                    h2: ({ children }) => <h2 style={{ fontSize: '1.4em', fontWeight: 'bold', marginTop: '1.2em', marginBottom: '0.6em', borderBottom: '1px solid #eaecef', paddingBottom: '0.3em' }}>{children}</h2>,
+                    h3: ({ children }) => <h3 style={{ fontSize: '1.2em', fontWeight: 'bold', marginTop: '1.2em', marginBottom: '0.6em' }}>{children}</h3>,
                     p: ({ children }) => <p style={{ lineHeight: '1.8', marginBottom: '1em', color: '#24292e' }}>{children}</p>,
                     ul: ({ children }) => <ul style={{ paddingLeft: '2em', marginBottom: '1em', lineHeight: '1.8' }}>{children}</ul>,
                     ol: ({ children }) => <ol style={{ paddingLeft: '2em', marginBottom: '1em', lineHeight: '1.8' }}>{children}</ol>,
@@ -213,11 +545,12 @@ function KnowledgePage() {
                       return <code className={className} {...props}>{children}</code>;
                     },
                     pre: ({ children }) => <pre style={{
-                      backgroundColor: '#282c34',
-                      padding: '16px',
+                      backgroundColor: '#ffffff',
+                      padding: '12px',
                       borderRadius: '6px',
                       overflow: 'auto',
-                      marginBottom: '1em'
+                      marginBottom: '1em',
+                      border: '1px solid #e8e8e8'
                     }}>{children}</pre>,
                     blockquote: ({ children }) => <blockquote style={{
                       borderLeft: '4px solid #dfe2e5',
@@ -249,26 +582,206 @@ function KnowledgePage() {
                     a: ({ children, href }) => <a href={href} style={{ color: '#0366d6', textDecoration: 'none' }}>{children}</a>,
                   }}
                 >
-                  {fileContent}
+                  {generatedContent || (aiGenerating && '等待 AI 生成内容...')}
                 </ReactMarkdown>
               </div>
-            ) : (
-              <Empty
-                description={
-                  <Space direction="vertical" size="small">
-                    <Paragraph type="secondary">请在左侧文件树中选择文件</Paragraph>
-                    <Text type="secondary" style={{ fontSize: 12 }}>
-                      仅支持预览 Markdown 格式文件
-                    </Text>
-                  </Space>
-                }
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                style={{ marginTop: 80 }}
-              />
-            )}
-          </Spin>
-        </Card>
-      </Content>
+              <div style={{
+                padding: '12px',
+                borderTop: '1px solid #f0f0f0',
+                display: 'flex',
+                gap: '8px',
+              }}>
+                <Button
+                  icon={<CloseOutlined />}
+                  onClick={handleCancelAiResult}
+                  style={{ flex: 1 }}
+                >
+                  取消
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<CheckOutlined />}
+                  onClick={handleConfirmAiResult}
+                  style={{ flex: 1 }}
+                >
+                  确认保存
+                </Button>
+              </div>
+            </div>
+          ) : (
+            /* 对话模式 */
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* 上方 2/3：对话显示 */}
+              <div style={{
+                flex: 2,
+                padding: '16px',
+                overflow: 'auto',
+                borderBottom: '1px solid #f0f0f0',
+              }}>
+                <Space direction="vertical" style={{ width: '100%' }} size="middle">
+                  {chatMessages.length === 0 && (
+                    <Empty
+                      description={
+                        <Space direction="vertical" size="small">
+                          <Text type="secondary">开始与 AI 对话</Text>
+                          <Text type="secondary" style={{ fontSize: 12 }}>
+                            {aiMode === 'advise' ? 'AI 建议模式' : 'AI 编辑模式'}
+                          </Text>
+                        </Space>
+                      }
+                      image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    />
+                  )}
+                  {chatMessages.map((msg, index) => (
+                    <div
+                      key={index}
+                      style={{
+                        padding: '12px',
+                        borderRadius: '8px',
+                        background: msg.role === 'user' ? '#e6f7ff' : '#f6f8fa',
+                        maxWidth: '85%',
+                        alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <Text strong style={{ display: 'block', marginBottom: '4px', fontSize: 12 }}>
+                        {msg.role === 'user' ? '用户' : 'AI'}
+                      </Text>
+                      {msg.role === 'assistant' ? (
+                        <div style={{ fontSize: 13, lineHeight: '1.6' }}>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                            components={{
+                              h1: ({ children }) => <h1 style={{ fontSize: '1.5em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h1>,
+                              h2: ({ children }) => <h2 style={{ fontSize: '1.3em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h2>,
+                              h3: ({ children }) => <h3 style={{ fontSize: '1.1em', fontWeight: 'bold', marginTop: '0.6em', marginBottom: '0.3em' }}>{children}</h3>,
+                              p: ({ children }) => <p style={{ margin: '0.4em 0' }}>{children}</p>,
+                              ul: ({ children }) => <ul style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ul>,
+                              ol: ({ children }) => <ol style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ol>,
+                              li: ({ children }) => <li style={{ marginBottom: '0.2em' }}>{children}</li>,
+                              code: ({ inline, className, children, ...props }) => {
+                                if (inline) {
+                                  return <code style={{
+                                    backgroundColor: 'rgba(27, 31, 35, 0.05)',
+                                    padding: '0.1em 0.3em',
+                                    borderRadius: '3px',
+                                    fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                                    fontSize: '0.9em'
+                                  }} {...props}>{children}</code>;
+                                }
+                                return <code className={className} {...props}>{children}</code>;
+                              },
+                              pre: ({ children }) => <pre style={{
+                                backgroundColor: '#ffffff',
+                                padding: '8px',
+                                borderRadius: '4px',
+                                overflow: 'auto',
+                                margin: '0.4em 0',
+                                fontSize: '12px',
+                                border: '1px solid #e8e8e8'
+                              }}>{children}</pre>,
+                              blockquote: ({ children }) => <blockquote style={{
+                                borderLeft: '3px solid #dfe2e5',
+                                padding: '0 0.8em',
+                                color: '#6a737d',
+                                margin: '0.4em 0',
+                                fontSize: '0.95em'
+                              }}>{children}</blockquote>,
+                            }}
+                          >
+                            {msg.content}
+                          </ReactMarkdown>
+                        </div>
+                      ) : (
+                        <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
+                          {msg.content}
+                        </Paragraph>
+                      )}
+                    </div>
+                  ))}
+                  {aiGenerating && (
+                    <div style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: '#f6f8fa',
+                      maxWidth: '85%',
+                    }}>
+                      <Text type="secondary">AI 正在生成...</Text>
+                    </div>
+                  )}
+                </Space>
+              </div>
+
+              {/* 下方 1/3：输入区域 */}
+              <div style={{
+                flex: 1,
+                padding: '16px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}>
+                {/* 模式切换 */}
+                <Radio.Group
+                  value={aiMode}
+                  onChange={(e) => setAiMode(e.target.value)}
+                  style={{ width: '100%' }}
+                  size="small"
+                >
+                  <Radio.Button value="advise">
+                    <Space size="small">
+                      <ThunderboltOutlined />
+                      AI 建议
+                    </Space>
+                  </Radio.Button>
+                  <Radio.Button value="edit">
+                    <Space size="small">
+                      <EditOutlined2 />
+                      AI 编辑
+                    </Space>
+                  </Radio.Button>
+                </Radio.Group>
+
+                {/* 输入框和按钮 */}
+                <div style={{ display: 'flex', gap: '8px', flex: 1, alignItems: 'flex-end' }}>
+                  <TextArea
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    placeholder={aiMode === 'advise' ? '请输入您的问题...' : '请输入编辑要求...'}
+                    onPressEnter={(e) => {
+                      if (!e.shiftKey) {
+                        e.preventDefault();
+                        handleSendAiMessage();
+                      }
+                    }}
+                    autoSize={{ minRows: 2, maxRows: 4 }}
+                    style={{ flex: 1 }}
+                  />
+                  <Button
+                    type="primary"
+                    icon={<SendOutlined />}
+                    onClick={handleSendAiMessage}
+                    disabled={aiGenerating || !userInput.trim()}
+                    style={{ height: 'auto' }}
+                  >
+                    发送
+                  </Button>
+                </div>
+
+                {/* 一键排版按钮 */}
+                <Button
+                  type="primary"
+                  icon={<BgColorsOutlined />}
+                  onClick={handleOneClickOptimize}
+                  disabled={aiGenerating || !selectedFile}
+                  style={{ width: '100%' }}
+                >
+                  一键排版
+                </Button>
+              </div>
+            </div>
+          )}
+        </Sider>
+      )}
     </Layout>
   );
 }

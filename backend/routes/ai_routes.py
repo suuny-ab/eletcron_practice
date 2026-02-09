@@ -10,7 +10,7 @@ from ..utils import create_json_stream
 from ..core.exceptions import ValidationException
 
 # 创建路由器
-router = APIRouter()
+router = APIRouter(prefix="/ai", tags=["AI"])
 
 # 初始化服务层
 ai_service = get_ai_service()

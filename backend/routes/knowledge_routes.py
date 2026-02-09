@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from ..utils.config_manager import config_manager
 from ..schemas.responses import DataResponse, FileTreeData, FileTreeNode
+from ..schemas.requests import FileUpdateRequest
 from ..core.exceptions import NotFoundException, ValidationException
 
 # 创建路由器
@@ -153,4 +154,54 @@ async def get_file_content(relative_path: str):
             "size": file_path.stat().st_size
         },
         message="文件读取成功"
+    )
+
+
+@router.put("/file/{relative_path:path}", response_model=DataResponse[dict])
+async def update_file_content(relative_path: str, request: FileUpdateRequest):
+    """
+    更新文件内容
+
+    Args:
+        relative_path: 相对于知识库根目录的文件路径
+        request: 包含更新内容的请求体
+
+    Returns:
+        DataResponse[dict]: 包含更新结果的响应
+    """
+    # 读取配置
+    config = config_manager.read_config()
+    if not config:
+        raise NotFoundException("请先配置 Obsidian Vault 路径")
+
+    # 构建完整文件路径
+    vault_path = Path(config.obsidian_vault_path)
+    file_path = vault_path / relative_path
+
+    # 安全检查：确保文件在知识库目录内
+    try:
+        file_path.resolve().relative_to(vault_path.resolve())
+    except ValueError:
+        raise ValidationException("无效的文件路径")
+
+    if not file_path.exists():
+        raise NotFoundException(f"文件不存在: {relative_path}")
+
+    if not file_path.is_file():
+        raise ValidationException("路径不是文件")
+
+    # 写入文件内容
+    try:
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(request.content)
+    except Exception as e:
+        raise ValidationException(f"写入文件失败: {str(e)}")
+
+    return DataResponse[dict](
+        data={
+            "relative_path": relative_path.replace('\\', '/'),
+            "filename": file_path.name,
+            "size": file_path.stat().st_size
+        },
+        message="文件更新成功"
     )
