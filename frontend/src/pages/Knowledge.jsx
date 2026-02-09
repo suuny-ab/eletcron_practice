@@ -35,6 +35,7 @@ function KnowledgePage() {
   const [previewMode, setPreviewMode] = useState(false);
   const [originalContent, setOriginalContent] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
+  const abortControllerRef = useRef(null);
 
   // 切换展开/收起
   const toggleExpand = () => {
@@ -153,11 +154,14 @@ function KnowledgePage() {
       setGeneratedContent('');
       setAiGenerating(true);
 
+      // 创建 AbortController 用于中断请求
+      abortControllerRef.current = new AbortController();
+
       try {
-        const stream = await aiEdit(selectedFile.key, userInput);
+        const stream = await aiEdit(selectedFile.key, userInput, abortControllerRef.current.signal);
 
         // 流式读取响应
-        for await (const chunk of readStream(stream)) {
+        for await (const chunk of readStream(stream, abortControllerRef.current.signal)) {
           console.log('[handleSendAiMessage] Received chunk:', chunk);
           setGeneratedContent(prev => {
             const newContent = prev + chunk;
@@ -175,6 +179,7 @@ function KnowledgePage() {
       } finally {
         console.log('[handleSendAiMessage] Finally block, setting aiGenerating to false');
         setAiGenerating(false);
+        abortControllerRef.current = null;
       }
       return;
     }
@@ -185,14 +190,17 @@ function KnowledgePage() {
     setUserInput('');
     setAiGenerating(true);
 
+    // 创建 AbortController 用于中断请求
+    abortControllerRef.current = new AbortController();
+
     try {
-      const stream = await aiAdvise(selectedFile.key, userInput);
+      const stream = await aiAdvise(selectedFile.key, userInput, abortControllerRef.current.signal);
 
       // 先添加一个空的AI响应消息
       setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       // 流式读取响应
-      for await (const chunk of readStream(stream)) {
+      for await (const chunk of readStream(stream, abortControllerRef.current.signal)) {
         setChatMessages(prev => {
           const newMessages = [...prev];
           const lastIndex = newMessages.length - 1;
@@ -212,6 +220,7 @@ function KnowledgePage() {
       }]);
     } finally {
       setAiGenerating(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -228,12 +237,15 @@ function KnowledgePage() {
     setGeneratedContent('');
     setAiGenerating(true);
 
+    // 创建 AbortController 用于中断请求
+    abortControllerRef.current = new AbortController();
+
     try {
-      const stream = await aiOptimize(selectedFile.key);
+      const stream = await aiOptimize(selectedFile.key, abortControllerRef.current.signal);
       console.log('[handleOneClickOptimize] Stream received');
 
       // 流式读取响应
-      for await (const chunk of readStream(stream)) {
+      for await (const chunk of readStream(stream, abortControllerRef.current.signal)) {
         console.log('[handleOneClickOptimize] Received chunk:', chunk);
         setGeneratedContent(prev => {
           const newContent = prev + chunk;
@@ -251,6 +263,7 @@ function KnowledgePage() {
     } finally {
       console.log('[handleOneClickOptimize] Finally block, setting aiGenerating to false');
       setAiGenerating(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -272,11 +285,17 @@ function KnowledgePage() {
     }
   };
 
-  // 取消 AI 结果
+  // 取消 AI 生成或结果
   const handleCancelAiResult = () => {
+    // 如果正在生成，中断请求
+    if (aiGenerating && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('[handleCancelAiResult] Aborting AI generation');
+    }
     setPreviewMode(false);
     setOriginalContent('');
     setGeneratedContent('');
+    setAiGenerating(false);
   };
 
   return (
@@ -602,9 +621,10 @@ function KnowledgePage() {
                 <Button
                   icon={<CloseOutlined />}
                   onClick={handleCancelAiResult}
+                  disabled={!aiGenerating && !generatedContent}
                   style={{ flex: 1 }}
                 >
-                  取消
+                  {aiGenerating ? '取消生成' : '取消'}
                 </Button>
                 <Button
                   type="primary"

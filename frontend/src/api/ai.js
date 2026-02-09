@@ -18,15 +18,17 @@ const apiClient = axios.create({
  * AI 建议接口
  * @param {string} filename - 文件名
  * @param {string} question - 用户问题
+ * @param {AbortSignal} signal - 中断信号
  * @returns {AsyncGenerator} 流式响应生成器
  */
-export async function aiAdvise(filename, question) {
+export async function aiAdvise(filename, question, signal) {
   const response = await fetch(`${API_BASE_URL}/ai/advise`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ filename, question }),
+    signal,
   });
 
   if (!response.ok) {
@@ -40,15 +42,17 @@ export async function aiAdvise(filename, question) {
  * AI 编辑接口
  * @param {string} filename - 文件名
  * @param {string} requirement - 编辑要求
+ * @param {AbortSignal} signal - 中断信号
  * @returns {AsyncGenerator} 流式响应生成器
  */
-export async function aiEdit(filename, requirement) {
+export async function aiEdit(filename, requirement, signal) {
   const response = await fetch(`${API_BASE_URL}/ai/edit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ filename, requirement }),
+    signal,
   });
 
   if (!response.ok) {
@@ -61,15 +65,17 @@ export async function aiEdit(filename, requirement) {
 /**
  * 一键排版接口
  * @param {string} filename - 文件名
+ * @param {AbortSignal} signal - 中断信号
  * @returns {AsyncGenerator} 流式响应生成器
  */
-export async function aiOptimize(filename) {
+export async function aiOptimize(filename, signal) {
   const response = await fetch(`${API_BASE_URL}/ai/optimize`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ filename }),
+    signal,
   });
 
   if (!response.ok) {
@@ -82,14 +88,20 @@ export async function aiOptimize(filename) {
 /**
  * 读取流式响应
  * @param {ReadableStream} stream - 流式响应
+ * @param {AbortSignal} signal - 中断信号
  * @returns {AsyncGenerator<string>} 文本生成器
  */
-export async function* readStream(stream) {
+export async function* readStream(stream, signal) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
 
   try {
     while (true) {
+      if (signal && signal.aborted) {
+        console.log('[readStream] Stream aborted by user');
+        break;
+      }
+
       const { done, value } = await reader.read();
 
       if (done) {
