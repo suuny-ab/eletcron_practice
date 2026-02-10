@@ -60,24 +60,3 @@ class SessionCleanupService:
 
         logger.info(f"清理完成，共清理 {cleaned_count} 个孤儿会话")
         return cleaned_count
-
-
-# 全局清理服务实例
-_cleanup_service: Optional[SessionCleanupService] = None
-
-
-def get_cleanup_service() -> SessionCleanupService:
-    """获取清理服务实例"""
-    global _cleanup_service
-    if _cleanup_service is None:
-        _cleanup_service = SessionCleanupService()
-    return _cleanup_service
-
-
-def set_cleanup_notes_root(notes_root: Path) -> None:
-    """设置清理服务的笔记根目录"""
-    global _cleanup_service
-    if _cleanup_service is None:
-        _cleanup_service = SessionCleanupService(notes_root=notes_root)
-    else:
-        _cleanup_service.notes_root = notes_root

@@ -4,7 +4,7 @@
 from fastapi import Request
 
 from ..ai_engine import AIEngine
-from ..services import AIService
+from ..services import AIService, SessionCleanupService
 from ..utils.config_manager import config_manager
 
 
@@ -32,6 +32,19 @@ def get_ai_service(request: Request) -> AIService:
         AIService 实例
     """
     return request.app.state.ai_service
+
+
+def get_cleanup_service(request: Request) -> SessionCleanupService:
+    """
+    获取清理服务实例（单例）
+
+    Args:
+        request: FastAPI 请求对象
+
+    Returns:
+        SessionCleanupService 实例
+    """
+    return request.app.state.cleanup_service
 
 
 def get_config(request: Request):

@@ -17,7 +17,7 @@ from .utils.config_manager import config_manager
 from .ai_engine import AIEngine
 
 # 导入清理服务
-from .services.cleanup_service import set_cleanup_notes_root, get_cleanup_service
+from .services.cleanup_service import SessionCleanupService
 
 logger = get_logger(__name__)
 
@@ -35,6 +35,9 @@ async def startup_event():
     """应用启动时执行"""
     logger.info("应用启动中...")
 
+    # 初始化清理服务单例
+    app.state.cleanup_service = SessionCleanupService()
+
     # 注册配置变更监听器
     _register_config_listeners()
 
@@ -49,8 +52,7 @@ async def startup_event():
 
             # 启动时自动清理孤儿会话
             if config.obsidian_vault_path:
-                cleanup_service = get_cleanup_service()
-                cleaned_count = await cleanup_service.cleanup_orphaned_sessions()
+                cleaned_count = await app.state.cleanup_service.cleanup_orphaned_sessions()
                 if cleaned_count > 0:
                     logger.info(f"启动时清理了 {cleaned_count} 个孤儿会话")
         else:
@@ -92,7 +94,7 @@ def _register_config_listeners():
     def update_cleanup_notes_root(config):
         """更新清理服务的笔记根目录"""
         if config.obsidian_vault_path:
-            set_cleanup_notes_root(Path(config.obsidian_vault_path))
+            app.state.cleanup_service.notes_root = Path(config.obsidian_vault_path)
 
     app.state.config_context.register_listener(update_cleanup_notes_root)
 
