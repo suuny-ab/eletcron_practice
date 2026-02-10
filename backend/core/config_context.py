@@ -39,9 +39,13 @@ class ConfigContext:
         if self._updating:
             raise ConfigError("不允许在监听器中更新配置（防止循环依赖）")
 
-        logger.info(f"开始更新配置: obsidian_vault_path={new_config.obsidian_vault_path}, model_name={new_config.model_name}")
+        vault_path = getattr(new_config, 'obsidian_vault_path', '')
+        model_name = getattr(new_config, 'model_name', '')
+        logger.info(f"开始更新配置: obsidian_vault_path={vault_path}, model_name={model_name}")
 
         self._updating = True
+        failed_listeners = []
+
         try:
             self._config = new_config
 
@@ -49,8 +53,15 @@ class ConfigContext:
                 listener_name = self._get_listener_name(listener)
                 logger.info(f"执行监听器 {idx + 1}/{len(self._listeners)}: {listener_name}")
 
-                listener(new_config)
-                logger.info(f"监听器 {listener_name} 执行成功")
+                try:
+                    listener(new_config)
+                    logger.info(f"监听器 {listener_name} 执行成功")
+                except Exception as e:
+                    logger.error(f"监听器 {listener_name} 执行失败: {e}")
+                    failed_listeners.append((listener_name, e))
+
+            if failed_listeners:
+                raise ConfigError(f"{len(failed_listeners)} 个监听器执行失败: {[name for name, _ in failed_listeners]}")
 
         finally:
             self._updating = False
@@ -63,7 +74,15 @@ class ConfigContext:
 
         Args:
             listener: 监听器函数，接收配置对象参数
+
+        Raises:
+            ConfigError: 监听器已注册时抛出
         """
+        if listener in self._listeners:
+            listener_name = self._get_listener_name(listener)
+            logger.warning(f"监听器 {listener_name} 已存在，跳过注册")
+            return
+
         self._listeners.append(listener)
         logger.info(f"已注册监听器: {self._get_listener_name(listener)}")
 

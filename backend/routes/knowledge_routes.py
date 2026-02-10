@@ -7,73 +7,13 @@ from pathlib import Path
 from fastapi import APIRouter
 from ..utils.config_manager import config_manager
 from ..utils import read_knowledge_file
-from ..utils.knowledge_utils import write_file
-from ..schemas.responses import DataResponse, FileTreeData, FileTreeNode, FileReadResult, FileWriteResult
+from ..utils.knowledge_utils import write_file, build_file_tree
+from ..schemas.responses import DataResponse, FileTreeData, FileReadResult, FileWriteResult
 from ..schemas.requests import FileUpdateRequest
 from ..core.exceptions import NotFoundException, ValidationException
 
 # 创建路由器
 router = APIRouter(prefix="/knowledge", tags=["知识库"])
-
-
-def _build_file_tree(root_path: Path, relative_path: Path | None = None) -> list[FileTreeNode]:
-    """
-    递归构建文件树
-
-    Args:
-        root_path: 根目录路径
-        relative_path: 相对根目录的当前路径
-
-    Returns:
-        文件树节点列表
-    """
-    if relative_path is None:
-        relative_path = Path("")
-
-    current_path = root_path / relative_path
-    nodes = []
-
-    # 排除的目录和文件
-    exclude_dirs = {'.obsidian', '.git', '.myapp', 'node_modules', '__pycache__', '.venv'}
-    exclude_files = {'.DS_Store'}
-
-    try:
-        # 遍历当前目录
-        for item in sorted(current_path.iterdir()):
-            # 跳过排除的目录
-            if item.is_dir() and item.name in exclude_dirs:
-                continue
-            # 跳过其他隐藏文件和排除的文件
-            if item.name.startswith('.') and item.name not in exclude_dirs:
-                continue
-            if item.name in exclude_files:
-                continue
-
-            rel_item_path = relative_path / item.name
-
-            if item.is_dir():
-                # 目录：递归构建子树
-                children = _build_file_tree(root_path, rel_item_path)
-                if children:  # 只添加非空目录
-                    nodes.append(FileTreeNode(
-                        key=str(rel_item_path).replace('\\', '/'),
-                        title=item.name,
-                        is_leaf=False,
-                        children=children
-                    ))
-            elif item.is_file():
-                # 文件：添加叶子节点
-                nodes.append(FileTreeNode(
-                    key=str(rel_item_path).replace('\\', '/'),
-                    title=item.name,
-                    is_leaf=True,
-                    children=None
-                ))
-    except PermissionError:
-        # 跳过无权限访问的目录
-        pass
-
-    return nodes
 
 
 @router.get("/tree", response_model=DataResponse[FileTreeData])
@@ -97,7 +37,7 @@ async def get_file_tree():
         raise ValidationException(f"知识库路径不是目录: {config.obsidian_vault_path}")
 
     # 构建文件树
-    tree = _build_file_tree(vault_path)
+    tree = build_file_tree(vault_path)
 
     return DataResponse[FileTreeData](
         data=FileTreeData(tree=tree),

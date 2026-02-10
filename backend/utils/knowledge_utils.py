@@ -5,7 +5,7 @@
 from pathlib import Path
 from .config_manager import config_manager
 from ..core.exceptions import NotFoundException, ValidationException
-from ..schemas.responses import FileReadResult, FileWriteResult
+from ..schemas.responses import FileReadResult, FileWriteResult, FileTreeNode
 
 
 
@@ -31,6 +31,66 @@ def _get_vault_path() -> Path:
         raise ValidationException(f"知识库路径不是目录: {config.obsidian_vault_path}")
 
     return vault_path
+
+
+def build_file_tree(root_path: Path, relative_path: Path | None = None) -> list[FileTreeNode]:
+    """
+    递归构建文件树
+
+    Args:
+        root_path: 根目录路径
+        relative_path: 相对根目录的当前路径
+
+    Returns:
+        文件树节点列表
+    """
+    if relative_path is None:
+        relative_path = Path("")
+
+    current_path = root_path / relative_path
+    nodes = []
+
+    # 排除的目录和文件
+    exclude_dirs = {'.obsidian', '.git', '.myapp', 'node_modules', '__pycache__', '.venv'}
+    exclude_files = {'.DS_Store'}
+
+    try:
+        # 遍历当前目录
+        for item in sorted(current_path.iterdir()):
+            # 跳过排除的目录
+            if item.is_dir() and item.name in exclude_dirs:
+                continue
+            # 跳过其他隐藏文件和排除的文件
+            if item.name.startswith('.') and item.name not in exclude_dirs:
+                continue
+            if item.name in exclude_files:
+                continue
+
+            rel_item_path = relative_path / item.name
+
+            if item.is_dir():
+                # 目录：递归构建子树
+                children = build_file_tree(root_path, rel_item_path)
+                if children:  # 只添加非空目录
+                    nodes.append(FileTreeNode(
+                        key=str(rel_item_path).replace('\\', '/'),
+                        title=item.name,
+                        is_leaf=False,
+                        children=children
+                    ))
+            elif item.is_file():
+                # 文件：添加叶子节点
+                nodes.append(FileTreeNode(
+                    key=str(rel_item_path).replace('\\', '/'),
+                    title=item.name,
+                    is_leaf=True,
+                    children=None
+                ))
+    except PermissionError:
+        # 跳过无权限访问的目录
+        pass
+
+    return nodes
 
 
 def get_full_path(relative_path: str) -> Path:
