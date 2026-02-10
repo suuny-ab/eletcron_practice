@@ -12,11 +12,13 @@
 - 🖱️ 可拖动调整左右侧边栏宽度
 
 ### AI 智能功能
-- **AI 建议**: 与 AI 对话获取知识建议，专业友好的回复
+- **AI 建议**: 与 AI 对话获取知识建议，支持上下文记忆，专业友好的回复
 - **AI 编辑**: 根据要求智能编辑笔记内容，支持预览后确认保存
 - **一键排版**: 自动优化 Markdown 格式和结构，提升文档可读性
 - 🔄 实时流式输出显示，用户体验流畅
 - ⏸️ 生成过程中支持中断取消，灵活可控
+- 🧠 对话历史记忆：自动保存对话上下文，支持多轮对话
+- 📝 智能摘要滚动：超过 20 轮对话自动摘要并保留最近 6 轮
 
 ## 技术栈
 
@@ -55,6 +57,14 @@ test/
 │   ├── ai_engine/       # AI 核心引擎
 │   │   ├── core.py      # AI 引擎核心（通义千问调用）
 │   │   ├── base_handler.py  # AI 处理器基类
+│   │   ├── memory/      # 对话记忆模块
+│   │   │   ├── chat_history.py      # 会话持久化存储
+│   │   │   ├── session_resolver.py   # 会话 ID 解析
+│   │   │   └── summarizer.py         # 摘要生成器
+│   │   ├── template/     # 提示词模板
+│   │   │   └── builder.py            # 模板构建器
+│   │   ├── history/      # 历史记录管理
+│   │   │   └── manager.py            # 历史链管理
 │   │   └── config/      # 提示词配置
 │   │       └── prompt_config.py
 │   ├── core/            # 核心模块
@@ -71,7 +81,8 @@ test/
 │   │   ├── responses.py     # 响应模型
 │   │   └── stream_models.py # 流式响应模型
 │   ├── services/        # 业务逻辑层
-│   │   └── ai_service.py   # AI 服务层
+│   │   ├── ai_service.py   # AI 服务层
+│   │   └── cleanup_service.py  # 会话清理服务
 │   ├── utils/           # 工具函数
 │   │   ├── config_manager.py   # 配置管理器
 │   │   ├── knowledge_utils.py  # 知识库文件操作
@@ -235,8 +246,15 @@ npm run dist
 
 ### AI 提示词配置
 - 提示词模板化，易于维护和扩展
-- 支持排版优化、AI 建议、文档编辑等多种场景
+- 支持排版优化、AI 建议、文档编辑、对话摘要等多种场景
 - 可通过修改 `ai_engine/config/prompt_config.py` 自定义提示词
+
+### 对话历史记忆
+- 基于 LangChain 的 `BaseChatMessageHistory` 接口
+- JSONL 格式持久化存储，支持摘要滚动
+- 会话 ID 自动解析，对业务层透明
+- 启动时自动清理孤儿会话（已删除笔记的历史记录）
+- 摘要滚动策略：超过 20 轮对话时自动摘要并保留最近 6 轮
 
 ## 许可证
 
