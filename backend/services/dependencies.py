@@ -10,7 +10,7 @@ from ..utils.config_manager import config_manager
 
 def get_ai_engine(request: Request) -> AIEngine:
     """
-    获取 AI 引擎实例
+    获取 AI 引擎实例（单例）
 
     Args:
         request: FastAPI 请求对象
@@ -23,7 +23,7 @@ def get_ai_engine(request: Request) -> AIEngine:
 
 def get_ai_service(request: Request) -> AIService:
     """
-    获取 AI 服务实例（每次请求创建新实例）
+    获取 AI 服务实例（单例）
 
     Args:
         request: FastAPI 请求对象
@@ -31,8 +31,7 @@ def get_ai_service(request: Request) -> AIService:
     Returns:
         AIService 实例
     """
-    ai_engine = request.app.state.ai_engine
-    return AIService(ai_engine)
+    return request.app.state.ai_service
 
 
 def get_config(request: Request):
