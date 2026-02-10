@@ -2,9 +2,11 @@
 AI相关路由
 处理AI对话和排版优化等操作
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from starlette.responses import StreamingResponse
+
 from ..services import AIService
+from ..services.dependencies import get_ai_service
 from ..schemas import ChatRequest, OptimizeRequest, EditRequest
 from ..utils import create_json_stream
 from ..core.exceptions import ValidationException
@@ -19,12 +21,12 @@ STREAM_HEADERS = {
 # 创建路由器
 router = APIRouter(prefix="/ai", tags=["AI"])
 
-# 初始化服务层
-ai_service = AIService()
-
 
 @router.post("/optimize")
-async def optimize_layout(request: OptimizeRequest) -> StreamingResponse:
+async def optimize_layout(
+    request: OptimizeRequest,
+    ai_service: AIService = Depends(get_ai_service)
+) -> StreamingResponse:
     """
     对已上传的文件进行排版优化，流式返回结果
 
@@ -37,7 +39,6 @@ async def optimize_layout(request: OptimizeRequest) -> StreamingResponse:
 
     if not filename:
         raise ValidationException("必须提供 filename 参数")
-
 
     # 使用工具层包装服务层输出，完成JSON序列化
     generate = create_json_stream(
@@ -54,7 +55,10 @@ async def optimize_layout(request: OptimizeRequest) -> StreamingResponse:
 
 
 @router.post("/advise")
-async def advise_document(request: ChatRequest) -> StreamingResponse:
+async def advise_document(
+    request: ChatRequest,
+    ai_service: AIService = Depends(get_ai_service)
+) -> StreamingResponse:
     """
     接受用户问题和文件内容，返回 AI 建议
 
@@ -88,7 +92,10 @@ async def advise_document(request: ChatRequest) -> StreamingResponse:
 
 
 @router.post("/edit")
-async def edit_document(request: EditRequest) -> StreamingResponse:
+async def edit_document(
+    request: EditRequest,
+    ai_service: AIService = Depends(get_ai_service)
+) -> StreamingResponse:
     """
     对已上传的文件进行编辑，流式返回结果
 

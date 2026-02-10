@@ -19,15 +19,16 @@ from .history import HistoryManager
 class AIProcessor:
     """通用AI处理器 - 通过任务类型处理不同功能"""
 
-    def __init__(self, task_type: str):
+    def __init__(self, task_type: str, ai_engine: AIEngine):
         """
         初始化处理器
 
         Args:
             task_type: 任务类型 ('optimize', 'advise', 'edit')
+            ai_engine: AI 引擎实例
         """
         self.task_type = task_type
-        self.ai_engine = AIEngine()
+        self.ai_engine = ai_engine
         self.config = PromptConfigFactory.get_config(task_type)
         self.template_builder = TemplateBuilder()
         self.session_resolver = SessionResolver()

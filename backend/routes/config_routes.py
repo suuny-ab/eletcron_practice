@@ -2,10 +2,15 @@
 配置相关路由
 处理配置的读取、更新和删除操作
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+
 from ..utils.config_manager import config_manager
 from ..schemas.requests import UpdateConfigRequest
 from ..schemas.responses import DataResponse, BaseResponse, ConfigData
+from ..core import get_logger
+
+
+logger = get_logger(__name__)
 
 # 创建路由器
 router = APIRouter(prefix="/config", tags=["配置管理"])
@@ -34,25 +39,27 @@ async def get_config():
 
 
 @router.put("", response_model=DataResponse[ConfigData])
-async def update_config(request: UpdateConfigRequest):
+async def update_config(request: UpdateConfigRequest, http_request: Request):
     """
     更新配置
 
     Args:
         request: 配置更新请求数据
+        http_request: FastAPI 请求对象
 
     Returns:
         DataResponse[ConfigData]: 包含更新后配置数据的响应
     """
+    # 写入配置文件
     config = config_manager.write_config(
         obsidian_vault_path=request.obsidian_vault_path,
         api_key=request.api_key,
         model_name=request.model_name
     )
 
-    # 重新加载 AI 配置（由工具层负责）
-    from ..services.ai_service import reload_ai_service
-    reload_ai_service()
+    # 更新配置上下文（自动触发所有监听器）
+    config_context = http_request.app.state.config_context
+    config_context.update(config)
 
     return DataResponse[ConfigData](
         data=ConfigData(

@@ -1,35 +1,24 @@
 """
 AI服务层 - 编排排版优化、AI建议等业务逻辑
-直接使用通用AI处理器处理各类AI任务
 """
-from ..ai_engine import AIProcessor
+from ..ai_engine import AIProcessor, AIEngine
 from ..utils.knowledge_utils import read_file
 
 
 class AIService:
-    """AI服务类，处理排版优化和AI对话的业务逻辑 - 单例模式"""
+    """AI服务类，处理排版优化和AI对话的业务逻辑"""
 
-    _instance = None
-    _initialized = False
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __init__(self):
+    def __init__(self, ai_engine: AIEngine):
         """
-        初始化AI服务
-        从配置文件自动读取API密钥和模型名称
+        初始化 AI 服务
+
+        Args:
+            ai_engine: AI 引擎实例
         """
-        if self._initialized:
-            return
-
-        self.optimizer: AIProcessor = AIProcessor('optimize')
-        self.advisor: AIProcessor = AIProcessor('advise')
-        self.editor: AIProcessor = AIProcessor('edit')
-
-        self._initialized = True
+        self.ai_engine = ai_engine
+        self.optimizer: AIProcessor = AIProcessor('optimize', ai_engine)
+        self.advisor: AIProcessor = AIProcessor('advise', ai_engine)
+        self.editor: AIProcessor = AIProcessor('edit', ai_engine)
 
     async def optimize_markdown_layout_stream(self, filename: str):
         """
@@ -94,16 +83,3 @@ class AIService:
             requirement=requirement
         ):
             yield chunk
-
-
-def reload_ai_service() -> AIService:
-    """
-    重新加载AI服务实例（从配置文件读取最新配置）
-
-    Returns:
-        AIService 实例
-    """
-    # 重置单例状态
-    AIService._instance = None
-    AIService._initialized = False
-    return AIService()
