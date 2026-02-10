@@ -69,13 +69,28 @@ class EditConfig(PromptConfig):
     params: list[str] = ['content', 'requirement']
 
 
+class SummaryConfig(PromptConfig):
+    """对话摘要配置"""
+    system: str = """
+你是对话摘要器。请将以下对话内容压缩为一段摘要，保留关键结论、修改细则、明确的约束与约定，去除重复、闲聊与无关信息。
+
+摘要要求：
+1. 以清晰要点组织，不超过 200 字
+2. 必须保留用户已确认的修改决策与约束
+3. 不要引入新的内容，不做推测"""
+    human: str = """
+{conversation}"""
+    params: list[str] = ['conversation']
+
+
 class PromptConfigFactory:
     """提示词配置工厂"""
 
     _configs: dict[str, PromptConfig] = {
         'optimize': OptimizeConfig(),
         'advise': AdviseConfig(),
-        'edit': EditConfig()
+        'edit': EditConfig(),
+        'summary': SummaryConfig()
     }
 
     @classmethod

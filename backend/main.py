@@ -34,6 +34,16 @@ async def startup_event():
             # 初始化 AI 服务（会在内部读取配置）
             from .services.ai_service import AIService
             AIService()
+            # 初始化清理服务的笔记根目录
+            from .services.cleanup_service import set_cleanup_notes_root, get_cleanup_service
+            from pathlib import Path
+            if config.obsidian_vault_path:
+                set_cleanup_notes_root(Path(config.obsidian_vault_path))
+                # 启动时自动清理孤儿会话
+                cleanup_service = get_cleanup_service()
+                cleaned_count = await cleanup_service.cleanup_orphaned_sessions()
+                if cleaned_count > 0:
+                    logger.info(f"启动时清理了 {cleaned_count} 个孤儿会话")
         else:
             logger.info("未找到配置文件，请在界面中配置")
     except Exception as e:

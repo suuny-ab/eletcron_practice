@@ -45,6 +45,8 @@ __pycache__
 .venv/
 python/
 .pydeps/
+.vscode/
+data/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
