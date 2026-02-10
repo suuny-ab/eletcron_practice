@@ -17,8 +17,10 @@
   "scripts": {
     "start": "electron .",
     "build:renderer": "npm --prefix frontend run build",
-    "pack": "npm run build:renderer && electron-builder --dir",
-    "dist": "npm run build:renderer && electron-builder",
+    "build:pydeps": "python -m pip install -r backend/requirements.txt --target backend/.pydeps",
+    "build:all": "npm run build:pydeps && npm run build:renderer",
+    "pack": "npm run build:all && electron-builder --dir",
+    "dist": "npm run build:all && electron-builder",
     "test": "https://github.com/suuny-ab/eletcron_practice"
   },
   "devDependencies": {
@@ -34,8 +36,21 @@
       "backend/**/*",
       "package.json"
     ],
+    "asarUnpack": [
+      "backend/**"
+    ],
     "directories": {
       "buildResources": "build"
+    },
+    "extraResources": [
+      {
+        "from": "python",
+        "to": "python",
+        "filter": ["**/*"]
+      }
+    ],
+    "win": {
+      "signAndEditExecutable": false
     }
   },
   "dependencies": {

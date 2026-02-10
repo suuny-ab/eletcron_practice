@@ -43,6 +43,8 @@ clean/
 jspm_packages/
 __pycache__
 .venv/
+python/
+.pydeps/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/
