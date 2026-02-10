@@ -2,10 +2,8 @@
 流式响应工具函数 - 提供通用的流式响应处理
 """
 from ..schemas import StreamChunk, StreamComplete, StreamError
-from ..core import get_logger
+from ..core.error_handler import log_exception
 from collections.abc import Callable, AsyncGenerator
-
-logger = get_logger(__name__)
 
 
 
@@ -50,26 +48,13 @@ def create_json_stream(
             # ⑤ 捕获所有异常并发送错误信息
             # 流式响应不能通过全局异常处理器处理，必须在流式通道内发送错误
 
-            # 获取异常类型和模块信息
-            error_type = type(e).__name__
-            error_module = type(e).__module__
-
-            # 根据异常类型确定日志级别
-            if error_type in ('NotFoundException', 'ValidationException'):
-                logger.warning(
-                    (f"流式处理业务异常 [{error_type}]: {str(e)} | "
-                     f"生成器: {stream_generator.__name__ if hasattr(stream_generator, '__name__') else 'unknown'}")
-                )
-            else:
-                logger.error(
-                    (f"流式处理系统异常 [{error_type}]: {str(e)} | "
-                     f"生成器: {stream_generator.__name__ if hasattr(stream_generator, '__name__') else 'unknown'} | "
-                     f"模块: {error_module}"),
-                    exc_info=True  # 自动记录堆栈信息
-                )
+            # 使用统一的异常日志记录
+            generator_name = stream_generator.__name__ if hasattr(stream_generator, '__name__') else 'unknown'
+            log_exception(e, f"流式处理 | 生成器: {generator_name}")
 
             # 发送错误信息到客户端
             # 如果是业务异常，直接显示消息；如果是系统异常，显示通用消息
+            error_type = type(e).__name__
             if error_type in ('NotFoundException', 'ValidationException'):
                 error_message = str(e)
             else:

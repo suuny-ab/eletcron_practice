@@ -1,7 +1,6 @@
 """
 全局异常处理器 - 统一处理所有异常
 """
-import traceback
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -10,6 +9,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .exceptions import BaseBusinessException
 from ..schemas.responses import ErrorResponse
 from .logger import get_logger
+from .error_handler import log_exception
 
 logger = get_logger(__name__)
 
@@ -25,9 +25,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     Returns:
         JSONResponse: 错误响应
     """
-    logger.warning(
-        f"HTTP异常: {exc.status_code} - {exc.detail} | 路径: {request.url.path}"
-    )
+    log_exception(exc, f"HTTP异常 {exc.status_code} | 路径: {request.url.path}")
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -50,9 +48,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     Returns:
         JSONResponse: 错误响应
     """
-    logger.warning(
-        f"请求参数验证失败: {exc.errors()} | 路径: {request.url.path}"
-    )
+    log_exception(exc, f"请求参数验证失败 | 路径: {request.url.path}")
 
     # 提取第一个错误信息
     error_detail = exc.errors()[0]
@@ -80,10 +76,7 @@ async def business_exception_handler(request: Request, exc: BaseBusinessExceptio
     Returns:
         JSONResponse: 错误响应
     """
-    logger.error(
-        f"业务异常: {exc.__class__.__name__} - {exc.message} | "
-        f"错误码: {exc.error_code} | 路径: {request.url.path}"
-    )
+    log_exception(exc, f"业务异常 | 错误码: {exc.error_code} | 路径: {request.url.path}")
 
     return JSONResponse(
         status_code=exc.status_code,
@@ -106,14 +99,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
     Returns:
         JSONResponse: 错误响应
     """
-    logger.error(
-        f"未捕获的异常: {exc.__class__.__name__} - {str(exc)} | "
-        f"路径: {request.url.path}",
-        exc_info=True
-    )
-
-    # 记录完整的堆栈信息
-    logger.error(traceback.format_exc())
+    log_exception(exc, f"未捕获的异常 | 路径: {request.url.path}")
 
     # 生产环境不返回详细错误信息，开发环境返回
     from ..main import app
