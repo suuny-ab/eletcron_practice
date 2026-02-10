@@ -33,7 +33,8 @@ async def get_config():
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
             api_key=config.api_key,
-            model_name=config.model_name
+            model_name=config.model_name,
+            prompts=config.prompts
         )
     )
 
@@ -54,10 +55,11 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
     config = config_manager.write_config(
         obsidian_vault_path=request.obsidian_vault_path,
         api_key=request.api_key,
-        model_name=request.model_name
+        model_name=request.model_name,
+        prompts=request.prompts
     )
 
-    # 更新配置上下文（自动触发所有监听器）
+    # 更新配置上下文（自动触发所有监听器，包括提示词更新）
     config_context = http_request.app.state.config_context
     config_context.update(config)
 
@@ -65,7 +67,8 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
             api_key=config.api_key,
-            model_name=config.model_name
+            model_name=config.model_name,
+            prompts=config.prompts
         ),
         message="配置更新成功"
     )

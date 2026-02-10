@@ -33,6 +33,7 @@ class UpdateConfigRequest(BaseModel):
     obsidian_vault_path: str
     api_key: str
     model_name: str
+    prompts: dict[str, dict[str, str]] | None = None  # 可选的提示词配置
 
 
 class FileUpdateRequest(BaseModel):

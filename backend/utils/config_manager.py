@@ -14,6 +14,7 @@ class ConfigModel(BaseModel):
     obsidian_vault_path: str
     api_key: str
     model_name: str
+    prompts: dict[str, dict[str, str]] = {}  # 提示词配置 {task_type: {system, human}}
 
 
 class ConfigManager:
@@ -55,7 +56,7 @@ class ConfigManager:
         except Exception as e:
             raise ConfigError(f"读取配置文件失败: {e}")
     
-    def write_config(self, obsidian_vault_path: str, api_key: str, model_name: str) -> ConfigModel:
+    def write_config(self, obsidian_vault_path: str, api_key: str, model_name: str, prompts: dict[str, dict[str, str]] | None = None) -> ConfigModel:
         """
         写入配置文件
 
@@ -63,6 +64,7 @@ class ConfigManager:
             obsidian_vault_path: Obsidian Vault 绝对路径
             api_key: API密钥
             model_name: 模型名称
+            prompts: 提示词配置（可选）
 
         Returns:
             ConfigModel: 保存后的配置对象
@@ -73,11 +75,14 @@ class ConfigManager:
         self._ensure_config_dir()
 
         try:
-            config = ConfigModel(
-                obsidian_vault_path=obsidian_vault_path,
-                api_key=api_key,
-                model_name=model_name
-            )
+            config_data = {
+                "obsidian_vault_path": obsidian_vault_path,
+                "api_key": api_key,
+                "model_name": model_name
+            }
+            if prompts:
+                config_data["prompts"] = prompts
+            config = ConfigModel(**config_data)
         except ValidationError as e:
             raise ConfigError(f"配置数据验证失败: {e}")
 

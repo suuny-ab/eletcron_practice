@@ -90,13 +90,22 @@ def _register_config_listeners():
 
     app.state.config_context.register_listener(update_ai_components)
 
-    # 监听器 2：更新清理服务的笔记根目录（可以后执行）
+    # 监听器 2：更新清理服务的笔记根目录
     def update_cleanup_notes_root(config):
         """更新清理服务的笔记根目录"""
         if config.obsidian_vault_path:
             app.state.cleanup_service.notes_root = Path(config.obsidian_vault_path)
 
     app.state.config_context.register_listener(update_cleanup_notes_root)
+
+    # 监听器 3：更新提示词配置
+    def update_prompts(config):
+        """更新提示词配置"""
+        from .ai_engine.config.prompt_config import PromptConfigFactory
+        if hasattr(config, 'prompts') and config.prompts:
+            PromptConfigFactory.update_configs(config.prompts)
+
+    app.state.config_context.register_listener(update_prompts)
 
 
 # 注册路由

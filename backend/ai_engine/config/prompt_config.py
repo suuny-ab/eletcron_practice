@@ -1,4 +1,5 @@
 """提示词配置模块"""
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -84,18 +85,73 @@ class SummaryConfig(PromptConfig):
 
 
 class PromptConfigFactory:
-    """提示词配置工厂"""
+    """提示词配置工厂 - 支持动态配置"""
 
-    _configs: dict[str, PromptConfig] = {
+    # 默认配置（当用户未自定义时使用）
+    _default_configs: dict[str, PromptConfig] = {
         'optimize': OptimizeConfig(),
         'advise': AdviseConfig(),
         'edit': EditConfig(),
         'summary': SummaryConfig()
     }
 
+    # 用户自定义配置（从配置文件加载）
+    _custom_configs: dict[str, PromptConfig] = {}
+
     @classmethod
     def get_config(cls, task_type: str) -> PromptConfig:
-        """根据任务类型获取配置"""
-        if task_type not in cls._configs:
-            raise ValueError(f"不支持的任务类型: {task_type}")
-        return cls._configs[task_type]
+        """根据任务类型获取配置（优先使用自定义配置）"""
+        if task_type in cls._custom_configs:
+            return cls._custom_configs[task_type]
+        if task_type in cls._default_configs:
+            return cls._default_configs[task_type]
+        raise ValueError(f"不支持的任务类型: {task_type}")
+
+    @classmethod
+    def update_configs(cls, prompts: dict[str, dict[str, str]]) -> None:
+        """
+        更新自定义提示词配置
+
+        Args:
+            prompts: 提示词字典 {task_type: {system, human}}
+        """
+        cls._custom_configs.clear()
+        for task_type, prompt_data in prompts.items():
+            if task_type in cls._default_configs:
+                # 更新现有任务的提示词
+                default_config = cls._default_configs[task_type]
+                cls._custom_configs[task_type] = PromptConfig(
+                    system=prompt_data.get('system', default_config.system),
+                    human=prompt_data.get('human', default_config.human),
+                    params=default_config.params
+                )
+
+    @classmethod
+    def reset_config(cls, task_type: str) -> None:
+        """
+        重置某个任务类型的提示词为默认值
+
+        Args:
+            task_type: 任务类型
+        """
+        if task_type in cls._custom_configs:
+            del cls._custom_configs[task_type]
+
+    @classmethod
+    def get_all_configs(cls) -> dict[str, dict[str, str]]:
+        """
+        获取所有提示词配置（用于前端显示）
+
+        Returns:
+            {task_type: {system, human, is_custom}}
+        """
+        result = {}
+        for task_type in ['optimize', 'advise', 'edit', 'summary']:
+            config = cls.get_config(task_type)
+            is_custom = task_type in cls._custom_configs
+            result[task_type] = {
+                'system': config.system,
+                'human': config.human,
+                'is_custom': is_custom
+            }
+        return result
