@@ -17,10 +17,13 @@
   "scripts": {
     "start": "electron .",
     "build:renderer": "npm --prefix frontend run build",
-    "build:pydeps": "python -m pip install -r backend/requirements.txt --target backend/.pydeps",
+    "build:pydeps": "python -m pip install -r backend/requirements.txt --target backend/.pydeps --upgrade",
     "build:all": "npm run build:pydeps && npm run build:renderer",
     "pack": "npm run build:all && electron-builder --dir",
     "dist": "npm run build:all && electron-builder",
+    "dist:win": "npm run build:all && electron-builder --win",
+    "clean:pydeps": "rmdir /s /q backend\\.pydeps 2>nul || echo Done",
+    "clean:all": "npm run clean:pydeps && rmdir /s /q frontend\\dist 2>nul || echo Done",
     "test": "https://github.com/suuny-ab/eletcron_practice"
   },
   "devDependencies": {
@@ -34,10 +37,14 @@
       "main.js",
       "frontend/dist/**/*",
       "backend/**/*",
-      "package.json"
+      "package.json",
+      "diagnose.bat",
+      "INSTALL_TROUBLESHOOTING.md"
     ],
     "asarUnpack": [
-      "backend/**"
+      "backend/**",
+      "diagnose.bat",
+      "INSTALL_TROUBLESHOOTING.md"
     ],
     "directories": {
       "buildResources": "build"
@@ -51,6 +58,10 @@
     ],
     "win": {
       "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     }
   },
   "dependencies": {

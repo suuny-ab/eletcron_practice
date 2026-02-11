@@ -256,6 +256,41 @@ npm run dist
 - 启动时自动清理孤儿会话（已删除笔记的历史记录）
 - 摘要滚动策略：超过 20 轮对话时自动摘要并保留最近 6 轮
 
+## 安装与使用
+
+### 快速开始
+
+#### 方式 1：从源码运行（开发者）
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/suuny-ab/eletcron_practice.git
+cd eletcron_practice
+
+# 2. 启动开发环境
+.\start-dev.bat  # Windows
+# 或
+./start-dev.sh   # Linux/Mac
+```
+
+#### 方式 2：使用预编译安装包（用户）
+
+1. 从 [GitHub Releases](https://github.com/suuny-ab/eletcron_practice/releases) 下载最新安装包
+2. 运行安装程序
+3. 首次启动后配置：
+   - Obsidian Vault 路径
+   - 通义千问 API Key
+   - 模型名称（默认 qwen3-max）
+
+### 打包发布
+
+详细打包指南请参考 [PACKAGING.md](./PACKAGING.md)
+
+**快速打包：**
+```bash
+npm run dist
+```
+
 ## 许可证
 
 ISC
