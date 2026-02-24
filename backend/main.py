@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from pathlib import Path
 
 # 导入路由模块
-from .routes import ai_router, config_router, knowledge_router
+from .routes import ai_router, config_router, knowledge_router, rag_router
 
 # 导入全局异常处理器
 from .core import register_exception_handlers, get_logger, ConfigContext
@@ -41,6 +41,11 @@ async def startup_event():
     # 注册配置变更监听器
     _register_config_listeners()
 
+    # 启动RAG服务文件监听器（如果已初始化）
+    if hasattr(app.state, "rag_service") and app.state.rag_service:
+        app.state.rag_service.start_watcher()
+        logger.info("RAG服务文件监听器已启动")
+
     # 尝试从配置文件加载配置
     try:
         config = config_manager.read_config()
@@ -69,6 +74,11 @@ async def startup_event():
 async def shutdown_event():
     """应用关闭时执行"""
     logger.info("应用关闭中...")
+
+    # 停止RAG服务文件监听器
+    if hasattr(app.state, "rag_service") and app.state.rag_service:
+        app.state.rag_service.stop_watcher()
+        logger.info("RAG服务文件监听器已停止")
 
 
 def _register_config_listeners():
@@ -107,11 +117,40 @@ def _register_config_listeners():
 
     app.state.config_context.register_listener(update_prompts)
 
+    # 监听器 4：更新 RAG 服务
+    def update_rag_service(config):
+        """更新 RAG 服务"""
+        from .rag import RAGService
+
+        # 停止旧的RAG服务
+        if hasattr(app.state, "rag_service") and app.state.rag_service:
+            app.state.rag_service.stop_watcher()
+
+        # 创建新的RAG服务
+        if config.obsidian_vault_path and config.api_key:
+            try:
+                app.state.rag_service = RAGService(
+                    notes_root=config.obsidian_vault_path,
+                    api_key=config.api_key,
+                    model_name="text-embedding-v3",
+                    llm_model="qwen-max"
+                )
+                app.state.rag_service.start_watcher()
+                logger.info("RAG服务已初始化并启动文件监听")
+            except Exception as e:
+                logger.error(f"RAG服务初始化失败: {e}")
+                app.state.rag_service = None
+        else:
+            app.state.rag_service = None
+
+    app.state.config_context.register_listener(update_rag_service)
+
 
 # 注册路由
 app.include_router(ai_router, tags=["AI"])
 app.include_router(config_router, tags=["config"])
 app.include_router(knowledge_router, tags=["knowledge"])
+app.include_router(rag_router, tags=["RAG"])
 
 
 

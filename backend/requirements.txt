@@ -12,8 +12,16 @@ python-dotenv==1.2.1
 langchain==1.2.9
 langchain-core==1.2.9
 langchain-community==0.4.1
+langchain-chroma==1.1.0
+langchain-text-split==1.1.0
 dashscope==1.25.11
 uuid-utils==0.14.0
 
+# 向量数据库
+chromadb==1.5.1
+
 # 数据验证
 pydantic==2.12.5
+
+# 文件监测
+watchdog==6.0.0

@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
-import { Tree, Card, message, Spin, Typography, Empty, Layout, Button, Space, Tag, Input, Select, Tabs } from 'antd';
-import { FolderOutlined, FileOutlined, ReloadOutlined, FolderOpenOutlined, EditOutlined, CheckOutlined, CloseOutlined, SendOutlined, BgColorsOutlined, EditOutlined as EditOutlined2, ThunderboltOutlined, MenuUnfoldOutlined, MenuFoldOutlined } from '@ant-design/icons';
+import { Tree, Card, message, Spin, Typography, Empty, Layout, Button, Space, Tag, Input, Select, Tabs, Collapse } from 'antd';
+import { FolderOutlined, FileOutlined, ReloadOutlined, FolderOpenOutlined, EditOutlined, CheckOutlined, CloseOutlined, SendOutlined, BgColorsOutlined, EditOutlined as EditOutlined2, ThunderboltOutlined, MenuUnfoldOutlined, MenuFoldOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
 import { getFileTree, getFileContent, updateFileContent } from '../api/knowledge';
 import { aiAdvise, aiEdit, aiOptimize, readStream } from '../api/ai';
+import { ragAskStream, readRagStream } from '../api/rag';
 import ConfigPage from './Config';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -20,12 +21,13 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
   const [loading, setLoading] = useState(false);
   const hasInitialized = useRef(false);
   const [expandedKeys, setExpandedKeys] = useState([]);
+  const [selectedKeys, setSelectedKeys] = useState([]);
   const [openNotes, setOpenNotes] = useState([]);
   const [noteStates, setNoteStates] = useState({});
   const [activeMainTab, setActiveMainTab] = useState('notes');
 
   // AI 侧边栏状态
-  const [aiMode, setAiMode] = useState('advise'); // 'advise' | 'edit'
+  const [aiMode, setAiMode] = useState('advise'); // 'advise' | 'edit' | 'rag'
   const [chatMessages, setChatMessages] = useState([]);
   const [userInput, setUserInput] = useState('');
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -33,6 +35,12 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
   const [originalContent, setOriginalContent] = useState('');
   const [generatedContent, setGeneratedContent] = useState('');
   const abortControllerRef = useRef(null);
+  
+  // RAG 模式状态
+  const [ragMessages, setRagMessages] = useState([]);
+  const [ragSources, setRagSources] = useState([]);
+  const [ragTopK, setRagTopK] = useState(3);
+  const [ragLoading, setRagLoading] = useState(false);
 
   const noteDefaults = {
     content: '',
@@ -140,12 +148,24 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
       setPreviewMode(false);
       setOriginalContent('');
       setGeneratedContent('');
+      // RAG 模式不依赖 activeNoteKey，不需要重置
     }
   }, [activeNoteKey]);
+
+  // 切换到 RAG 模式时清空对话历史
+  useEffect(() => {
+    if (aiMode === 'rag') {
+      setRagMessages([]);
+      setRagSources([]);
+    }
+  }, [aiMode]);
   // 处理文件选择
   const handleSelect = async (selectedKeys, info) => {
     const node = info.node;
     if (node.is_leaf) {
+      // 设置选中的文件
+      setSelectedKeys(selectedKeys);
+
       // 检查文件扩展名
       const fileName = node.key;
       const isMarkdown = fileName.toLowerCase().endsWith('.md');
@@ -181,6 +201,92 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
           contentLoading: false,
           hasLoaded: true,
         });
+      } catch (error) {
+        message.error('加载文件失败: ' + (error.response?.data?.message || error.message));
+      }
+    }
+  };
+
+  // 在文件树中查找节点并展开父目录
+  const findAndExpandPath = (filename) => {
+    const pathParts = filename.split('/').filter(p => p);
+    const keysToExpand = [];
+
+    // 递归查找节点，收集需要展开的父节点key
+    const traverseTree = (nodes, currentPath = []) => {
+      for (const node of nodes) {
+        const nodePath = [...currentPath, node.title];
+        const pathString = nodePath.join('/');
+
+        // 检查节点是否匹配路径的一部分
+        for (let i = 0; i < pathParts.length; i++) {
+          const targetPath = pathParts.slice(0, i + 1).join('/');
+          if (pathString === targetPath) {
+            keysToExpand.push(node.key);
+            break;
+          }
+        }
+
+        // 递归处理子节点
+        if (node.children) {
+          traverseTree(node.children, nodePath);
+        }
+      }
+    };
+
+    traverseTree(treeData);
+
+    // 展开所有父节点
+    if (keysToExpand.length > 0) {
+      setExpandedKeys(prev => [...new Set([...prev, ...keysToExpand])]);
+    }
+  };
+
+  // 处理引用来源卡片点击
+  const handleFileSelect = async (filename) => {
+    // 1. 在文件树中展开并定位该文件
+    findAndExpandPath(filename);
+
+    // 2. 高亮选中的文件
+    setSelectedKeys([filename]);
+
+    // 3. 打开文件标签页
+    const noteKey = filename;
+    const tabKey = `note:${noteKey}`;
+
+    // 检查文件扩展名
+    const isMarkdown = filename.toLowerCase().endsWith('.md');
+    if (!isMarkdown) {
+      message.warning('仅支持预览 Markdown 格式文件');
+      return;
+    }
+
+    // 添加到打开的标签页
+    setOpenNotes(prev => {
+      if (prev.some(note => note.key === noteKey)) {
+        return prev;
+      }
+      const title = filename.split('/').pop();
+      return [...prev, { key: noteKey, title }];
+    });
+
+    // 切换到该标签页
+    setActiveMainTab(tabKey);
+
+    // 加载文件内容
+    const cachedState = noteStates[noteKey];
+    if (!cachedState?.hasLoaded) {
+      updateNoteState(noteKey, { contentLoading: true, isEditing: false });
+      try {
+        const response = await getFileContent(noteKey);
+        const content = response.data?.content || '';
+        updateNoteState(noteKey, {
+          content,
+          editContent: content,
+          contentLoading: false,
+          hasLoaded: true,
+        });
+        message.success(`已打开: ${filename}`);
       } catch (error) {
         updateNoteState(noteKey, { contentLoading: false });
         message.error('读取文件失败: ' + (error.response?.data?.message || error.message));
@@ -221,8 +327,68 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
 
   // AI 消息发送
   const handleSendAiMessage = async () => {
-    if (!userInput.trim() || !activeNoteKey) {
-      message.warning('请输入问题并选择笔记');
+    if (!userInput.trim()) {
+      message.warning('请输入问题');
+      return;
+    }
+
+    // RAG 模式：知识库问答
+    if (aiMode === 'rag') {
+      const question = userInput.trim();
+      setUserInput('');
+      setRagLoading(true);
+
+      // 添加用户消息
+      setRagMessages(prev => [...prev, { role: 'user', content: question }]);
+      // 添加空的 AI 响应消息
+      setRagMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+      // 清空来源
+      setRagSources([]);
+
+      // 创建 AbortController 用于中断请求
+      abortControllerRef.current = new AbortController();
+
+      try {
+        const stream = await ragAskStream(question, ragTopK, abortControllerRef.current.signal);
+
+        // 流式读取响应
+        let currentAnswer = '';
+        for await (const chunk of readRagStream(stream, abortControllerRef.current.signal)) {
+          if (chunk.type === 'answer') {
+            currentAnswer += chunk.content;
+            setRagMessages(prev => {
+              const newMessages = [...prev];
+              const lastIndex = newMessages.length - 1;
+              newMessages[lastIndex] = {
+                ...newMessages[lastIndex],
+                content: currentAnswer
+              };
+              return newMessages;
+            });
+          } else if (chunk.type === 'source') {
+            setRagSources(prev => [...prev, chunk.data]);
+          }
+        }
+      } catch (error) {
+        if (error.name === 'AbortError') {
+          message.info('已取消请求');
+        } else {
+          message.error('RAG 问答失败: ' + error.message);
+          setRagMessages(prev => [...prev, {
+            role: 'assistant',
+            content: `错误：${error.message}`
+          }]);
+        }
+      } finally {
+        setRagLoading(false);
+        abortControllerRef.current = null;
+      }
+      return;
+    }
+
+    // 非 RAG 模式需要选择笔记
+    if (!activeNoteKey) {
+      message.warning('请选择笔记');
       return;
     }
 
@@ -369,6 +535,11 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     if (aiGenerating && abortControllerRef.current) {
       abortControllerRef.current.abort();
       console.log('[handleCancelAiResult] Aborting AI generation');
+    }
+    // RAG 模式也需要中断
+    if (ragLoading && abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      console.log('[handleCancelAiResult] Aborting RAG request');
     }
     setPreviewMode(false);
     setOriginalContent('');
@@ -714,6 +885,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                   showIcon
                   expandedKeys={expandedKeys}
                   onExpand={setExpandedKeys}
+                  selectedKeys={selectedKeys}
                   onSelect={handleSelect}
                   treeData={treeData}
                   icon={({ is_leaf }) =>
@@ -865,9 +1037,13 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
             alignItems: 'center',
             justifyContent: 'space-between',
           }}>
-              <Text strong>{previewMode ? 'AI 排版预览' : (aiMode === 'advise' ? 'AI 建议' : 'AI 编辑')}</Text>
+              <Text strong>
+                {previewMode ? 'AI 排版预览' : 
+                 (aiMode === 'advise' ? 'AI 建议' : 
+                  aiMode === 'edit' ? 'AI 编辑' : '知识库问答')}
+              </Text>
               <Space size="small">
-                {aiGenerating && <span style={{ color: '#1890ff' }}>(生成中...)</span>}
+                {(aiGenerating || ragLoading) && <span style={{ color: '#1890ff' }}>(生成中...)</span>}
               </Space>
             </div>
             {previewMode ? (
@@ -978,96 +1154,221 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                 borderBottom: '1px solid #f0f0f0',
               }}>
                 <Space direction="vertical" style={{ width: '100%' }} size="middle">
-                  {chatMessages.length === 0 && (
-                    <Empty
-                      description={
-                        <Space direction="vertical" size="small">
-                          <Text type="secondary">开始与 AI 对话</Text>
-                          <Text type="secondary" style={{ fontSize: 12 }}>
-                            {aiMode === 'advise' ? 'AI 建议模式' : 'AI 编辑模式'}
-                          </Text>
-                        </Space>
-                      }
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    />
-                  )}
-                  {chatMessages.map((msg, index) => (
-                    <div
-                      key={index}
-                      style={{
-                        padding: '12px',
-                        borderRadius: '8px',
-                        background: msg.role === 'user' ? '#e6f7ff' : '#f6f8fa',
-                        maxWidth: '85%',
-                        alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                      }}
-                    >
-                      <Text strong style={{ display: 'block', marginBottom: '4px', fontSize: 12 }}>
-                        {msg.role === 'user' ? '用户' : 'AI'}
-                      </Text>
-                      {msg.role === 'assistant' ? (
-                        <div style={{ fontSize: 13, lineHeight: '1.6' }}>
-                          <ReactMarkdown
-                            remarkPlugins={[remarkGfm]}
-                            rehypePlugins={[rehypeHighlight, rehypeRaw]}
-                            components={{
-                              h1: ({ children }) => <h1 style={{ fontSize: '1.5em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h1>,
-                              h2: ({ children }) => <h2 style={{ fontSize: '1.3em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h2>,
-                              h3: ({ children }) => <h3 style={{ fontSize: '1.1em', fontWeight: 'bold', marginTop: '0.6em', marginBottom: '0.3em' }}>{children}</h3>,
-                              p: ({ children }) => <p style={{ margin: '0.4em 0' }}>{children}</p>,
-                              ul: ({ children }) => <ul style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ul>,
-                              ol: ({ children }) => <ol style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ol>,
-                              li: ({ children }) => <li style={{ marginBottom: '0.2em' }}>{children}</li>,
-                              code: ({ inline, className, children, ...props }) => {
-                                if (inline) {
-                                  return <code style={{
-                                    backgroundColor: 'rgba(27, 31, 35, 0.05)',
-                                    padding: '0.1em 0.3em',
-                                    borderRadius: '3px',
-                                    fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
-                                    fontSize: '0.9em'
-                                  }} {...props}>{children}</code>;
-                                }
-                                return <code className={className} {...props}>{children}</code>;
-                              },
-                              pre: ({ children }) => <pre style={{
-                                backgroundColor: '#ffffff',
-                                padding: '8px',
-                                borderRadius: '4px',
-                                overflow: 'auto',
-                                margin: '0.4em 0',
-                                fontSize: '12px',
-                                border: '1px solid #e8e8e8'
-                              }}>{children}</pre>,
-                              blockquote: ({ children }) => <blockquote style={{
-                                borderLeft: '3px solid #dfe2e5',
-                                padding: '0 0.8em',
-                                color: '#6a737d',
-                                margin: '0.4em 0',
-                                fontSize: '0.95em'
-                              }}>{children}</blockquote>,
-                            }}
-                          >
-                            {msg.content}
-                          </ReactMarkdown>
-                        </div>
-                      ) : (
-                        <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
-                          {msg.content}
-                        </Paragraph>
+                  {aiMode === 'rag' ? (
+                    /* RAG 模式对话 */
+                    <>
+                      {ragMessages.length === 0 && (
+                        <Empty
+                          description={
+                            <Space direction="vertical" size="small">
+                              <Text type="secondary">知识库问答</Text>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                向整个知识库提问，AI 会检索相关笔记并生成答案
+                              </Text>
+                            </Space>
+                          }
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        />
                       )}
-                    </div>
-                  ))}
-                  {aiGenerating && (
-                    <div style={{
-                      padding: '12px',
-                      borderRadius: '8px',
+                      {ragMessages.map((msg, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '8px',
+                            background: msg.role === 'user' ? '#e6f7ff' : '#f6f8fa',
+                            maxWidth: '85%',
+                            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                          }}
+                        >
+                          <Text strong style={{ display: 'block', marginBottom: '4px', fontSize: 12 }}>
+                            {msg.role === 'user' ? '用户' : 'AI'}
+                          </Text>
+                          {msg.role === 'assistant' ? (
+                            <div style={{ fontSize: 13, lineHeight: '1.6' }}>
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                                components={{
+                                  h1: ({ children }) => <h1 style={{ fontSize: '1.5em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h1>,
+                                  h2: ({ children }) => <h2 style={{ fontSize: '1.3em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h2>,
+                                  h3: ({ children }) => <h3 style={{ fontSize: '1.1em', fontWeight: 'bold', marginTop: '0.6em', marginBottom: '0.3em' }}>{children}</h3>,
+                                  p: ({ children }) => <p style={{ margin: '0.4em 0' }}>{children}</p>,
+                                  ul: ({ children }) => <ul style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ul>,
+                                  ol: ({ children }) => <ol style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ol>,
+                                  li: ({ children }) => <li style={{ marginBottom: '0.2em' }}>{children}</li>,
+                                  code: ({ inline, className, children, ...props }) => {
+                                    if (inline) {
+                                      return <code style={{
+                                        backgroundColor: 'rgba(27, 31, 35, 0.05)',
+                                        padding: '0.1em 0.3em',
+                                        borderRadius: '3px',
+                                        fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                                        fontSize: '0.9em'
+                                      }} {...props}>{children}</code>;
+                                    }
+                                    return <code className={className} {...props}>{children}</code>;
+                                  },
+                                  pre: ({ children }) => <pre style={{
+                                    backgroundColor: '#ffffff',
+                                    padding: '8px',
+                                    borderRadius: '4px',
+                                    overflow: 'auto',
+                                    margin: '0.4em 0',
+                                    fontSize: '12px',
+                                    border: '1px solid #e8e8e8'
+                                  }}>{children}</pre>,
+                                  blockquote: ({ children }) => <blockquote style={{
+                                    borderLeft: '3px solid #dfe2e5',
+                                    padding: '0 0.8em',
+                                    color: '#6a737d',
+                                    margin: '0.4em 0',
+                                    fontSize: '0.95em'
+                                  }}>{children}</blockquote>,
+                                }}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                              {/* 显示引用来源 */}
+                              {ragSources.length > 0 && (
+                                <Collapse
+                                  ghost
+                                  style={{ marginTop: 12 }}
+                                  items={[{
+                                    key: 'sources',
+                                    label: <><FileTextOutlined /> 引用来源 ({ragSources.length})</>,
+                                    children: ragSources.map((source, i) => (
+                                      <Card
+                                        key={i}
+                                        size="small"
+                                        title={source.filename}
+                                        extra={source.score && <Tag color="blue">{(source.score * 100).toFixed(0)}%</Tag>}
+                                        style={{ marginBottom: 8, cursor: 'pointer' }}
+                                        hoverable
+                                        onClick={() => handleFileSelect(source.filename)}
+                                      >
+                                        <Text ellipsis={{ rows: 2 }} style={{ fontSize: 12, color: '#666' }}>
+                                          {source.content}
+                                        </Text>
+                                      </Card>
+                                    ))
+                                  }]}
+                                />
+                              )}
+                            </div>
+                          ) : (
+                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
+                              {msg.content}
+                            </Paragraph>
+                          )}
+                        </div>
+                      ))}
+                      {ragLoading && (
+                        <div style={{
+                          padding: '12px',
+                          borderRadius: '8px',
+                          background: '#f6f8fa',
+                          maxWidth: '85%',
+                        }}>
+                          <Text type="secondary">AI 正在生成...</Text>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* AI 建议/编辑模式 */
+                    <>
+                      {chatMessages.length === 0 && (
+                        <Empty
+                          description={
+                            <Space direction="vertical" size="small">
+                              <Text type="secondary">开始与 AI 对话</Text>
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                {aiMode === 'advise' ? 'AI 建议模式' : 'AI 编辑模式'}
+                              </Text>
+                            </Space>
+                          }
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
+                        />
+                      )}
+                      {chatMessages.map((msg, index) => (
+                        <div
+                          key={index}
+                          style={{
+                            padding: '12px',
+                            borderRadius: '8px',
+                            background: msg.role === 'user' ? '#e6f7ff' : '#f6f8fa',
+                            maxWidth: '85%',
+                            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                          }}
+                        >
+                          <Text strong style={{ display: 'block', marginBottom: '4px', fontSize: 12 }}>
+                            {msg.role === 'user' ? '用户' : 'AI'}
+                          </Text>
+                          {msg.role === 'assistant' ? (
+                            <div style={{ fontSize: 13, lineHeight: '1.6' }}>
+                              <ReactMarkdown
+                                remarkPlugins={[remarkGfm]}
+                                rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                                components={{
+                                  h1: ({ children }) => <h1 style={{ fontSize: '1.5em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h1>,
+                                  h2: ({ children }) => <h2 style={{ fontSize: '1.3em', fontWeight: 'bold', marginTop: '0.8em', marginBottom: '0.4em' }}>{children}</h2>,
+                                  h3: ({ children }) => <h3 style={{ fontSize: '1.1em', fontWeight: 'bold', marginTop: '0.6em', marginBottom: '0.3em' }}>{children}</h3>,
+                                  p: ({ children }) => <p style={{ margin: '0.4em 0' }}>{children}</p>,
+                                  ul: ({ children }) => <ul style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ul>,
+                                  ol: ({ children }) => <ol style={{ paddingLeft: '1.5em', margin: '0.4em 0' }}>{children}</ol>,
+                                  li: ({ children }) => <li style={{ marginBottom: '0.2em' }}>{children}</li>,
+                                  code: ({ inline, className, children, ...props }) => {
+                                    if (inline) {
+                                      return <code style={{
+                                        backgroundColor: 'rgba(27, 31, 35, 0.05)',
+                                        padding: '0.1em 0.3em',
+                                        borderRadius: '3px',
+                                        fontFamily: 'SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
+                                        fontSize: '0.9em'
+                                      }} {...props}>{children}</code>;
+                                    }
+                                    return <code className={className} {...props}>{children}</code>;
+                                  },
+                                  pre: ({ children }) => <pre style={{
+                                    backgroundColor: '#ffffff',
+                                    padding: '8px',
+                                    borderRadius: '4px',
+                                    overflow: 'auto',
+                                    margin: '0.4em 0',
+                                    fontSize: '12px',
+                                    border: '1px solid #e8e8e8'
+                                  }}>{children}</pre>,
+                                  blockquote: ({ children }) => <blockquote style={{
+                                    borderLeft: '3px solid #dfe2e5',
+                                    padding: '0 0.8em',
+                                    color: '#6a737d',
+                                    margin: '0.4em 0',
+                                    fontSize: '0.95em'
+                                  }}>{children}</blockquote>,
+                                }}
+                              >
+                                {msg.content}
+                              </ReactMarkdown>
+                            </div>
+                          ) : (
+                            <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
+                              {msg.content}
+                            </Paragraph>
+                          )}
+                        </div>
+                      ))}
+                      {aiGenerating && (
+                        <div style={{
+                          padding: '12px',
+                          borderRadius: '8px',
                       background: '#f6f8fa',
                       maxWidth: '85%',
                     }}>
                       <Text type="secondary">AI 正在生成...</Text>
                     </div>
                   )}
+                  </>
+                )}
                 </Space>
               </div>
 
@@ -1083,7 +1384,11 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                 <TextArea
                   value={userInput}
                   onChange={(e) => setUserInput(e.target.value)}
-                  placeholder={aiMode === 'advise' ? '请输入您的问题...' : '请输入编辑要求...'}
+                  placeholder={
+                    aiMode === 'advise' ? '请输入您的问题...' :
+                    aiMode === 'edit' ? '请输入编辑要求...' :
+                    '请输入您的问题，AI 将检索整个知识库...'
+                  }
                   onPressEnter={(e) => {
                     if (!e.shiftKey) {
                       e.preventDefault();
@@ -1100,7 +1405,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                   <Select
                     value={aiMode}
                     onChange={setAiMode}
-                    style={{ width: 100 }}
+                    style={{ width: 120 }}
                     size="small"
                   >
                     <Select.Option value="advise">
@@ -1115,26 +1420,49 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                         AI 编辑
                       </Space>
                     </Select.Option>
+                    <Select.Option value="rag">
+                      <Space size="small">
+                        <SearchOutlined />
+                        知识库问答
+                      </Space>
+                    </Select.Option>
                   </Select>
 
-                  {/* 一键排版按钮 */}
-                  <Button
-                    type="primary"
-                    icon={<BgColorsOutlined />}
-                    onClick={handleOneClickOptimize}
-                    disabled={aiGenerating || !selectedFile}
-                    style={{ flex: 1 }}
-                  >
-                    一键排版
-                  </Button>
+                  {/* RAG 模式的 top_k 选择器 */}
+                  {aiMode === 'rag' && (
+                    <Select
+                      value={ragTopK}
+                      onChange={setRagTopK}
+                      style={{ width: 80 }}
+                      size="small"
+                    >
+                      <Select.Option value={1}>1 条</Select.Option>
+                      <Select.Option value={3}>3 条</Select.Option>
+                      <Select.Option value={5}>5 条</Select.Option>
+                      <Select.Option value={10}>10 条</Select.Option>
+                    </Select>
+                  )}
+
+                  {/* 一键排版按钮（非 RAG 模式显示） */}
+                  {aiMode !== 'rag' && (
+                    <Button
+                      type="primary"
+                      icon={<BgColorsOutlined />}
+                      onClick={handleOneClickOptimize}
+                      disabled={aiGenerating || !selectedFile}
+                      style={{ flex: 1 }}
+                    >
+                      一键排版
+                    </Button>
+                  )}
 
                   {/* 发送按钮 */}
                   <Button
                     type="primary"
                     icon={<SendOutlined />}
                     onClick={handleSendAiMessage}
-                    disabled={aiGenerating || !userInput.trim()}
-                    style={{ flex: 1 }}
+                    disabled={(aiGenerating || ragLoading) || !userInput.trim()}
+                    style={{ flex: aiMode === 'rag' ? 2 : 1 }}
                   >
                     发送
                   </Button>

@@ -58,3 +58,16 @@ def get_config(request: Request):
         配置对象
     """
     return config_manager.read_config()
+
+
+def get_rag_service(request: Request):
+    """
+    获取 RAG 服务实例（单例）
+
+    Args:
+        request: FastAPI 请求对象
+
+    Returns:
+        RAGService 实例，如果未初始化则返回 None
+    """
+    return getattr(request.app.state, "rag_service", None)

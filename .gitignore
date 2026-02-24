@@ -47,6 +47,7 @@ python/
 .pydeps/
 .vscode/
 data/
+.data/
 
 # Snowpack dependency directory (https://snowpack.dev/)
 web_modules/

@@ -88,3 +88,16 @@ class FileTreeData(BaseModel):
     """文件树数据"""
     tree: list[FileTreeNode]
 
+
+class RAGSource(BaseModel):
+    """RAG 检索到的文档来源"""
+    filename: str
+    content: str
+    score: float | None = None  # 相关性得分
+
+
+class RAGAnswer(BaseModel):
+    """RAG 问答回答"""
+    answer: str
+    sources: list[RAGSource] = []
+

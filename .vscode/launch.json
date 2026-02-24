@@ -20,11 +20,12 @@
       "type": "node",
       "request": "launch",
       "cwd": "${workspaceFolder}",
-      "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron",
+      "runtimeExecutable": "npm",
       "windows": {
-        "runtimeExecutable": "${workspaceFolder}/node_modules/.bin/electron.cmd"
+        "runtimeExecutable": "npm.cmd"
       },
-      "args": [".", "--remote-debugging-port=9222"],
+      "runtimeArgs": ["start"],
+      "args": ["--", "--remote-debugging-port=9222"],
       "outputCapture": "std",
       "console": "integratedTerminal"
     }

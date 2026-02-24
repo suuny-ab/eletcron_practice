@@ -79,6 +79,16 @@ echo Press Ctrl+C to stop all services
 echo ====================================
 echo.
 
+REM Kill any existing electron processes to avoid file locks
+echo [INFO] Checking for existing Electron processes...
+taskkill /F /IM electron.exe >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [OK] Existing Electron processes terminated
+) else (
+    echo [OK] No existing Electron processes
+)
+timeout /t 2 /nobreak >nul
+
 start "Backend" cmd /k "cd /d %~dp0 && python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload"
 timeout /t 3 /nobreak >nul
 start "Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
