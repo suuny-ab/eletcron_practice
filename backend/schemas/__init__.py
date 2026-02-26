@@ -3,7 +3,7 @@ Pydantic 模型定义
 定义API请求和响应的数据模型
 """
 
-from .requests import ChatRequest, SaveRequest, OptimizeRequest, EditRequest, FileUpdateRequest
+from .requests import ChatRequest, SaveRequest, OptimizeRequest, EditRequest, FileUpdateRequest, RAGRequest
 from .responses import (
     BaseResponse,
     DataResponse,
@@ -13,8 +13,13 @@ from .responses import (
     FileTreeData,
     FileReadResult,
     FileWriteResult,
+    RAGSource,
+    RAGAnswer,
+
+
  
 )
+
 from .stream_models import StreamChunk, StreamComplete, StreamError
 
 __all__ = [
@@ -23,6 +28,8 @@ __all__ = [
     'OptimizeRequest',
     'EditRequest',
     'FileUpdateRequest',
+    'RAGRequest',
+
     # 新的统一响应模型
     'BaseResponse',
     'DataResponse',
@@ -33,9 +40,14 @@ __all__ = [
     'FileTreeData',
     'FileReadResult',
     'FileWriteResult',
+    'RAGSource',
+    'RAGAnswer',
+
+
     # 流式模型
     'StreamChunk',
     'StreamComplete',
     'StreamError',
+
 
 ]

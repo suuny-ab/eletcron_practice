@@ -27,8 +27,8 @@ class FileChatMessageHistory(BaseChatMessageHistory):
         summarizer: Callable[[str | None, list[BaseMessage]], Awaitable[str]] | None = None
     ):
         self.session_id = session_id
-        backend_dir = Path(__file__).resolve().parents[1]
-        self.base_dir = base_dir or (backend_dir / "data" / "ai_sessions")
+        backend_dir = Path(__file__).resolve().parents[2]
+        self.base_dir = base_dir or (backend_dir / ".data" / "ai_sessions")
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.max_history_rounds = max_history_rounds
         self.trim_rounds = trim_rounds

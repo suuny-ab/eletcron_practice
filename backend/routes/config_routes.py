@@ -29,10 +29,12 @@ async def get_config():
         from ..core.exceptions import NotFoundException
         raise NotFoundException("配置文件不存在，请先创建配置")
 
+    api_key_masked = f"****{config.api_key[-4:]}" if config.api_key else ""
+
     return DataResponse[ConfigData](
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
-            api_key=config.api_key,
+            api_key=api_key_masked,
             model_name=config.model_name,
             prompts=config.prompts
         )
@@ -51,8 +53,8 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
     Returns:
         DataResponse[ConfigData]: 包含更新后配置数据的响应
     """
-    # 写入配置文件
-    config = config_manager.write_config(
+    # 构建配置对象（不写入磁盘）
+    config = config_manager.build_config(
         obsidian_vault_path=request.obsidian_vault_path,
         api_key=request.api_key,
         model_name=request.model_name,
@@ -63,10 +65,15 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
     config_context = http_request.app.state.config_context
     config_context.update(config)
 
+    # 所有监听器成功后再写入配置文件
+    config_manager.save_config(config)
+
+    api_key_masked = f"****{config.api_key[-4:]}" if config.api_key else ""
+
     return DataResponse[ConfigData](
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
-            api_key=config.api_key,
+            api_key=api_key_masked,
             model_name=config.model_name,
             prompts=config.prompts
         ),

@@ -6,10 +6,13 @@ from fastapi import APIRouter, Depends
 from starlette.responses import StreamingResponse
 
 from ..services import AIService
-from ..services.dependencies import get_ai_service
-from ..schemas import ChatRequest, OptimizeRequest, EditRequest
+from ..services.dependencies import get_ai_service, get_rag_service
+from ..schemas import ChatRequest, OptimizeRequest, EditRequest, RAGRequest
+
 from ..utils import create_json_stream
 from ..core.exceptions import ValidationException
+
+
 
 STREAM_HEADERS = {
     "Cache-Control": "no-cache",
@@ -48,7 +51,7 @@ async def optimize_layout(
 
     return StreamingResponse(
         generate(),
-        media_type="text/plain; charset=utf-8",
+        media_type="application/x-ndjson",
         headers=STREAM_HEADERS
     )
 
@@ -56,6 +59,7 @@ async def optimize_layout(
 
 @router.post("/advise")
 async def advise_document(
+
     request: ChatRequest,
     ai_service: AIService = Depends(get_ai_service)
 ) -> StreamingResponse:
@@ -85,7 +89,7 @@ async def advise_document(
 
     return StreamingResponse(
         generate(),
-        media_type="text/plain; charset=utf-8",
+        media_type="application/x-ndjson",
         headers=STREAM_HEADERS
     )
 
@@ -93,6 +97,7 @@ async def advise_document(
 
 @router.post("/edit")
 async def edit_document(
+
     request: EditRequest,
     ai_service: AIService = Depends(get_ai_service)
 ) -> StreamingResponse:
@@ -122,6 +127,46 @@ async def edit_document(
 
     return StreamingResponse(
         generate(),
-        media_type="text/plain; charset=utf-8",
+        media_type="application/x-ndjson",
         headers=STREAM_HEADERS
     )
+
+
+
+
+
+@router.post("/rag")
+async def rag_answer(
+    request: RAGRequest,
+    ai_service: AIService = Depends(get_ai_service),
+    rag_service = Depends(get_rag_service)
+):
+    """
+    知识库问答接口（RAG 检索 + AI 问答）
+    """
+    question = request.question.strip() if request.question else ""
+
+    if not question:
+        raise ValidationException("必须提供 question 参数")
+
+    if not rag_service:
+        raise ValidationException("RAG 服务未初始化，请先配置知识库路径与模型")
+
+    generate = create_json_stream(
+        ai_service.rag_answer_stream,
+        rag_service,
+        question,
+        request.top_k
+    )
+
+
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers=STREAM_HEADERS
+    )
+
+
+
+
+

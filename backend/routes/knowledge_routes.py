@@ -2,51 +2,33 @@
 知识库相关路由
 处理知识库文件树扫描、文件读取等操作
 """
-from pathlib import Path
-
-from fastapi import APIRouter
-from ..utils.config_manager import config_manager
-from ..utils import read_knowledge_file
-from ..utils.knowledge_utils import write_file, build_file_tree
+from fastapi import APIRouter, Depends
+from ..services.dependencies import get_knowledge_service
 from ..schemas.responses import DataResponse, FileTreeData, FileReadResult, FileWriteResult
 from ..schemas.requests import FileUpdateRequest
-from ..core.exceptions import NotFoundException, ValidationException
 
 # 创建路由器
 router = APIRouter(prefix="/knowledge", tags=["知识库"])
 
 
 @router.get("/tree", response_model=DataResponse[FileTreeData])
-async def get_file_tree():
+async def get_file_tree(knowledge_service = Depends(get_knowledge_service)):
     """
     获取知识库文件树
 
     Returns:
         DataResponse[FileTreeData]: 包含文件树数据的响应
     """
-    # 读取配置
-    config = config_manager.read_config()
-    if not config:
-        raise NotFoundException("请先配置 Obsidian Vault 路径")
-
-    vault_path = Path(config.obsidian_vault_path)
-    if not vault_path.exists():
-        raise NotFoundException(f"知识库路径不存在: {config.obsidian_vault_path}")
-
-    if not vault_path.is_dir():
-        raise ValidationException(f"知识库路径不是目录: {config.obsidian_vault_path}")
-
-    # 构建文件树
-    tree = build_file_tree(vault_path)
+    tree = knowledge_service.get_file_tree()
 
     return DataResponse[FileTreeData](
-        data=FileTreeData(tree=tree),
+        data=tree,
         message="文件树获取成功"
     )
 
 
 @router.get("/file/{relative_path:path}", response_model=DataResponse[FileReadResult])
-async def get_file_content(relative_path: str):
+async def get_file_content(relative_path: str, knowledge_service = Depends(get_knowledge_service)):
     """
     读取文件内容
 
@@ -56,9 +38,8 @@ async def get_file_content(relative_path: str):
     Returns:
         DataResponse[FileReadResult]: 包含文件内容的响应
     """
-    # 使用工具层读取文件，复用已有逻辑
-    file_info = read_knowledge_file(relative_path)
-    
+    file_info = knowledge_service.read_file(relative_path)
+
     return DataResponse[FileReadResult](
         data=file_info,
         message="文件读取成功"
@@ -66,7 +47,7 @@ async def get_file_content(relative_path: str):
 
 
 @router.put("/file/{relative_path:path}", response_model=DataResponse[FileWriteResult])
-async def update_file_content(relative_path: str, request: FileUpdateRequest):
+async def update_file_content(relative_path: str, request: FileUpdateRequest, knowledge_service = Depends(get_knowledge_service)):
     """
     更新文件内容
 
@@ -77,9 +58,8 @@ async def update_file_content(relative_path: str, request: FileUpdateRequest):
     Returns:
         DataResponse[FileWriteResult]: 包含更新结果的响应
     """
-    # 使用工具层写入文件，复用已有逻辑
-    file_info = write_file(relative_path, request.content)
-    
+    file_info = knowledge_service.write_file(relative_path, request.content)
+
     return DataResponse[FileWriteResult](
         data=file_info,
         message="文件更新成功"

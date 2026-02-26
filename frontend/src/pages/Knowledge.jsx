@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Tree, Card, message, Spin, Typography, Empty, Layout, Button, Space, Tag, Input, Select, Tabs, Collapse } from 'antd';
 import { FolderOutlined, FileOutlined, ReloadOutlined, FolderOpenOutlined, EditOutlined, CheckOutlined, CloseOutlined, SendOutlined, BgColorsOutlined, EditOutlined as EditOutlined2, ThunderboltOutlined, MenuUnfoldOutlined, MenuFoldOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
 import { getFileTree, getFileContent, updateFileContent } from '../api/knowledge';
-import { aiAdvise, aiEdit, aiOptimize, readStream } from '../api/ai';
-import { ragAskStream, readRagStream } from '../api/rag';
+import { aiAdvise, aiEdit, aiOptimize, ragAskStream, readEventStream } from '../api/ai';
 import ConfigPage from './Config';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -353,9 +352,9 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
 
         // 流式读取响应
         let currentAnswer = '';
-        for await (const chunk of readRagStream(stream, abortControllerRef.current.signal)) {
-          if (chunk.type === 'answer') {
-            currentAnswer += chunk.content;
+        for await (const event of readEventStream(stream, abortControllerRef.current.signal)) {
+          if (event.type === 'chunk' && event.content) {
+            currentAnswer += event.content;
             setRagMessages(prev => {
               const newMessages = [...prev];
               const lastIndex = newMessages.length - 1;
@@ -365,8 +364,8 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
               };
               return newMessages;
             });
-          } else if (chunk.type === 'source') {
-            setRagSources(prev => [...prev, chunk.data]);
+          } else if (event.type === 'source' && event.data) {
+            setRagSources(prev => [...prev, event.data]);
           }
         }
       } catch (error) {
@@ -406,10 +405,13 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
         const stream = await aiEdit(activeNoteKey, userInput, abortControllerRef.current.signal);
 
         // 流式读取响应
-        for await (const chunk of readStream(stream, abortControllerRef.current.signal)) {
-          console.log('[handleSendAiMessage] Received chunk:', chunk);
+        for await (const event of readEventStream(stream, abortControllerRef.current.signal)) {
+          if (event.type !== 'chunk') {
+            continue;
+          }
+          console.log('[handleSendAiMessage] Received chunk:', event.content);
           setGeneratedContent(prev => {
-            const newContent = prev + chunk;
+            const newContent = prev + (event.content || '');
             console.log('[handleSendAiMessage] Generated content length:', newContent.length);
             return newContent;
           });
@@ -445,14 +447,17 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
       setChatMessages(prev => [...prev, { role: 'assistant', content: '' }]);
 
       // 流式读取响应
-      for await (const chunk of readStream(stream, abortControllerRef.current.signal)) {
+      for await (const event of readEventStream(stream, abortControllerRef.current.signal)) {
+        if (event.type !== 'chunk') {
+          continue;
+        }
         setChatMessages(prev => {
           const newMessages = [...prev];
           const lastIndex = newMessages.length - 1;
           // 创建新对象，避免引用问题
           newMessages[lastIndex] = {
             ...newMessages[lastIndex],
-            content: newMessages[lastIndex].content + chunk
+            content: newMessages[lastIndex].content + (event.content || '')
           };
           return newMessages;
         });
@@ -490,10 +495,13 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
       console.log('[handleOneClickOptimize] Stream received');
 
       // 流式读取响应
-      for await (const chunk of readStream(stream, abortControllerRef.current.signal)) {
-        console.log('[handleOneClickOptimize] Received chunk:', chunk);
+      for await (const event of readEventStream(stream, abortControllerRef.current.signal)) {
+        if (event.type !== 'chunk') {
+          continue;
+        }
+        console.log('[handleOneClickOptimize] Received chunk:', event.content);
         setGeneratedContent(prev => {
-          const newContent = prev + chunk;
+          const newContent = prev + (event.content || '');
           console.log('[handleOneClickOptimize] Generated content length:', newContent.length);
           return newContent;
         });

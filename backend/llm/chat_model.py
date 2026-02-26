@@ -1,29 +1,35 @@
 """
-AI引擎核心类 - 封装通义千问大模型调用
-提供底层的AI能力，不包含业务逻辑
+聊天模型服务 - 封装模型调用
 """
 from collections.abc import AsyncGenerator
-from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 
+from ..core.model_provider import ModelProvider
 
-class AIEngine:
-    """AI 引擎类，封装通义千问大模型调用"""
 
-    def __init__(self, api_key: str, model_name: str = "qwen3-max"):
+class ChatModelService:
+    """聊天模型服务 - 封装模型调用逻辑"""
+
+    def __init__(self, model_provider: ModelProvider):
         """
-        初始化 AI 引擎
+        初始化聊天模型服务
 
         Args:
-            api_key: 通义千问 API Key
-            model_name: 模型名称，默认 qwen3-max
+            model_provider: 模型提供者实例
         """
-        self.chat_model: ChatTongyi = ChatTongyi(
-            api_key=api_key,  # pyright: ignore[reportArgumentType]
-            model=model_name
-        )
-        self.output_parser: StrOutputParser = StrOutputParser()
+        self._model_provider = model_provider
+        self._output_parser = StrOutputParser()
+
+    @property
+    def chat_model(self):
+        """获取聊天模型（从注入的 ModelProvider）"""
+        return self._model_provider.chat_model
+
+    @property
+    def output_parser(self):
+        """获取输出解析器"""
+        return self._output_parser
 
     async def stream_generate(self, messages: list[BaseMessage]) -> AsyncGenerator[str, None]:
         """
@@ -38,7 +44,7 @@ class AIEngine:
         Raises:
             Exception: AI流式处理失败时抛出异常（可能是网络错误、API错误等）
         """
-        stream = self.chat_model | self.output_parser
+        stream = self.chat_model | self._output_parser
         async for chunk in stream.astream(input=messages):
             if chunk:
                 yield chunk

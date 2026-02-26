@@ -5,7 +5,7 @@
 from importlib import import_module
 
 from ..memory.chat_history import FileChatMessageHistory
-from ..memory.summarizer import Summarizer
+from ..summarizer import Summarizer
 
 
 class HistoryManager:

@@ -91,7 +91,6 @@ test/
 │   │   └── dependencies.py  # FastAPI 依赖注入
 │   ├── utils/           # 工具函数
 │   │   ├── config_manager.py   # 配置文件读写管理
-│   │   ├── knowledge_utils.py  # 知识库文件操作（186 行）
 │   │   └── stream_utils.py     # 流式响应工具
 │   ├── data/            # 数据目录
 │   │   └── ai_sessions/         # AI 会话历史存储

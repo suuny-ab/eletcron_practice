@@ -1,7 +1,7 @@
 """
 API响应模型 - 定义API接口的响应数据结构
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Generic, TypeVar
 from datetime import datetime
 
@@ -16,7 +16,7 @@ class BaseResponse(BaseModel):
     """基础响应模型"""
     success: bool = True
     message: str = "操作成功"
-    timestamp: str = datetime.now().isoformat()
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 class DataResponse(BaseModel, Generic[T]):
@@ -38,7 +38,7 @@ class DataResponse(BaseModel, Generic[T]):
     success: bool = True
     message: str = "操作成功"
     data: T
-    timestamp: str = datetime.now().isoformat()
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 class ErrorResponse(BaseModel):
@@ -46,7 +46,7 @@ class ErrorResponse(BaseModel):
     success: bool = False
     message: str
     error_code: str | None = None
-    timestamp: str = datetime.now().isoformat()
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 # ==================== 数据模型（只定义数据部分）====================
@@ -99,5 +99,5 @@ class RAGSource(BaseModel):
 class RAGAnswer(BaseModel):
     """RAG 问答回答"""
     answer: str
-    sources: list[RAGSource] = []
+    sources: list[RAGSource] = Field(default_factory=list)
 

@@ -6,6 +6,7 @@ from typing import Callable
 
 from .logger import get_logger
 from .exceptions import ConfigError
+from ..utils.config_manager import config_manager
 
 logger = get_logger(__name__)
 
@@ -44,29 +45,43 @@ class ConfigContext:
         logger.info(f"开始更新配置: obsidian_vault_path={vault_path}, model_name={model_name}")
 
         self._updating = True
-        failed_listeners = []
+        rollback_actions: list[tuple[str, Callable[[], None]]] = []
+        old_config = self._config
+        old_runtime_config = config_manager.get_runtime_config()
 
         try:
-            self._config = new_config
+            config_manager.set_runtime_config(new_config)
 
             for idx, listener in enumerate(self._listeners):
                 listener_name = self._get_listener_name(listener)
                 logger.info(f"执行监听器 {idx + 1}/{len(self._listeners)}: {listener_name}")
 
+                rollback = listener(new_config)
+                if callable(rollback):
+                    rollback_actions.append((listener_name, rollback))
+
+                logger.info(f"监听器 {listener_name} 执行成功")
+
+            self._config = new_config
+            logger.info("配置更新完成")
+        except Exception as e:
+            logger.error(f"配置更新失败: {e}，开始回滚")
+
+            for listener_name, rollback in reversed(rollback_actions):
                 try:
-                    listener(new_config)
-                    logger.info(f"监听器 {listener_name} 执行成功")
-                except Exception as e:
-                    logger.error(f"监听器 {listener_name} 执行失败: {e}")
-                    failed_listeners.append((listener_name, e))
+                    rollback()
+                    logger.info(f"回滚成功: {listener_name}")
+                except Exception as rollback_error:
+                    logger.error(f"回滚失败: {listener_name} - {rollback_error}")
 
-            if failed_listeners:
-                raise ConfigError(f"{len(failed_listeners)} 个监听器执行失败: {[name for name, _ in failed_listeners]}")
+            config_manager.set_runtime_config(old_runtime_config)
+            self._config = old_config
 
+            if isinstance(e, ConfigError):
+                raise
+            raise ConfigError(f"监听器执行失败: {e}") from e
         finally:
             self._updating = False
-
-        logger.info("配置更新完成")
 
     def register_listener(self, listener: Callable[[object], None]) -> None:
         """

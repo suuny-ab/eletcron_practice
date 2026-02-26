@@ -86,31 +86,32 @@ export async function aiOptimize(filename, signal) {
 }
 
 /**
- * 读取流式响应
+ * 读取事件流式响应
  * @param {ReadableStream} stream - 流式响应
  * @param {AbortSignal} signal - 中断信号
- * @returns {AsyncGenerator<string>} 文本生成器
+ * @returns {AsyncGenerator<Object>} 返回事件对象
  */
-export async function* readStream(stream, signal) {
+export async function* readEventStream(stream, signal) {
   const reader = stream.getReader();
   const decoder = new TextDecoder();
 
   try {
     while (true) {
       if (signal && signal.aborted) {
-        console.log('[readStream] Stream aborted by user');
+        console.log('[readEventStream] Stream aborted by user');
         break;
       }
 
       const { done, value } = await reader.read();
 
       if (done) {
-        console.log('[readStream] Stream done');
+        console.log('[readEventStream] Stream done');
         break;
       }
 
       const chunk = decoder.decode(value, { stream: true });
-      console.log('[readStream] Received chunk:', chunk);
+      console.log('[readEventStream] Received chunk:', chunk);
+
       // 解析 JSON 格式的数据（每行一个 JSON 对象）
       const lines = chunk.split('\n');
       for (const line of lines) {
@@ -121,20 +122,52 @@ export async function* readStream(stream, signal) {
         const data = trimmedLine.startsWith('data: ') ? trimmedLine.slice(6) : trimmedLine;
         try {
           const parsed = JSON.parse(data);
-          console.log('[readStream] Parsed:', parsed);
-          if (parsed.content) {
-            console.log('[readStream] Yielding content:', parsed.content);
-            yield parsed.content;
-          } else if (parsed.error) {
+          console.log('[readEventStream] Parsed:', parsed);
+
+          if (parsed.type === 'complete') {
+            console.log('[readEventStream] Stream complete');
+            return;
+          }
+
+          if (parsed.type === 'error') {
+            throw new Error(parsed.content || parsed.message || '请求失败');
+          }
+
+          if (parsed.error) {
             throw new Error(parsed.error);
           }
-          // 忽略其他消息类型（如 StreamComplete）
-        } catch {
-          // 忽略解析错误
+
+          yield parsed;
+        } catch (e) {
+          console.warn('[readEventStream] Failed to parse line:', trimmedLine, e);
         }
       }
     }
   } finally {
     reader.releaseLock();
   }
+}
+
+/**
+ * AI 知识库问答接口（RAG）
+ * @param {string} question - 用户问题
+ * @param {number} topK - 检索的文档数量
+ * @param {AbortSignal} signal - 中断信号
+ * @returns {ReadableStream} 流式响应
+ */
+export async function ragAskStream(question, topK = 3, signal) {
+  const response = await fetch(`${API_BASE_URL}/ai/rag`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question, top_k: topK }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.body;
 }

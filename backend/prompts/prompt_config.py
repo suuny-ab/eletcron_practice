@@ -1,5 +1,6 @@
 """提示词配置模块"""
 from typing import Optional
+import copy
 from pydantic import BaseModel, Field
 
 
@@ -70,6 +71,27 @@ class EditConfig(PromptConfig):
     params: list[str] = ['content', 'requirement']
 
 
+class RagQaConfig(PromptConfig):
+    """知识库问答配置"""
+    system: str = """
+你是一个智能知识库助手。请根据提供的参考资料回答用户的问题。
+
+回答要求：
+1. 仅基于提供的参考资料回答问题，不要使用外部知识
+2. 如果参考资料中没有相关信息，请明确告知
+3. 回答要简洁、准确、有条理
+4. 可以适当引用参考资料中的内容
+5. 使用清晰的格式（如列表、分段等）组织回答"""
+    human: str = """
+参考资料：
+{context}
+
+用户问题：{question}
+
+请基于以上参考资料回答问题。"""
+    params: list[str] = ['context', 'question']
+
+
 class SummaryConfig(PromptConfig):
     """对话摘要配置"""
     system: str = """
@@ -92,6 +114,7 @@ class PromptConfigFactory:
         'optimize': OptimizeConfig(),
         'advise': AdviseConfig(),
         'edit': EditConfig(),
+        'rag_qa': RagQaConfig(),
         'summary': SummaryConfig()
     }
 
@@ -146,7 +169,7 @@ class PromptConfigFactory:
             {task_type: {system, human, is_custom}}
         """
         result = {}
-        for task_type in ['optimize', 'advise', 'edit', 'summary']:
+        for task_type in ['optimize', 'advise', 'edit', 'rag_qa', 'summary']:
             config = cls.get_config(task_type)
             is_custom = task_type in cls._custom_configs
             result[task_type] = {
@@ -155,3 +178,13 @@ class PromptConfigFactory:
                 'is_custom': is_custom
             }
         return result
+
+    @classmethod
+    def snapshot_custom_configs(cls) -> dict[str, PromptConfig]:
+        """快照当前自定义提示词配置"""
+        return copy.deepcopy(cls._custom_configs)
+
+    @classmethod
+    def restore_custom_configs(cls, snapshot: dict[str, PromptConfig]) -> None:
+        """恢复自定义提示词配置"""
+        cls._custom_configs = snapshot

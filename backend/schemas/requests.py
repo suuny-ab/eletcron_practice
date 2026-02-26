@@ -45,4 +45,3 @@ class RAGRequest(BaseModel):
     """RAG 问答请求模型"""
     question: str
     top_k: int = 3  # 返回的最相关文档数量
-    stream: bool = False  # 是否使用流式响应

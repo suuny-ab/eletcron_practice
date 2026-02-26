@@ -4,7 +4,7 @@
 """
 import json
 from pathlib import Path
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel, ValidationError, Field
 
 from ..core.exceptions import ConfigError
 
@@ -14,7 +14,7 @@ class ConfigModel(BaseModel):
     obsidian_vault_path: str
     api_key: str
     model_name: str
-    prompts: dict[str, dict[str, str]] = {}  # 提示词配置 {task_type: {system, human}}
+    prompts: dict[str, dict[str, str]] = Field(default_factory=dict)  # 提示词配置 {task_type: {system, human}}
 
 
 class ConfigManager:
@@ -26,6 +26,7 @@ class ConfigManager:
     def __init__(self):
         self.config_dir = Path.home() / self.CONFIG_DIR_NAME
         self.config_file = self.config_dir / self.CONFIG_FILE_NAME
+        self._runtime_config: ConfigModel | None = None
     
     def _ensure_config_dir(self) -> None:
         """确保配置目录存在"""
@@ -34,7 +35,7 @@ class ConfigManager:
     
     def read_config(self) -> ConfigModel | None:
         """
-        读取配置文件
+        读取配置文件（优先返回运行时配置）
 
         Returns:
             ConfigModel: 配置对象，如果文件不存在则返回 None
@@ -42,6 +43,9 @@ class ConfigManager:
         Raises:
             ConfigError: 文件读取失败或配置格式错误时抛出
         """
+        if self._runtime_config is not None:
+            return self._runtime_config
+
         if not self.config_file.exists():
             return None
 
@@ -56,6 +60,64 @@ class ConfigManager:
         except Exception as e:
             raise ConfigError(f"读取配置文件失败: {e}")
     
+    def get_runtime_config(self) -> ConfigModel | None:
+        """获取运行时配置"""
+        return self._runtime_config
+
+    def set_runtime_config(self, config: ConfigModel | None) -> None:
+        """设置运行时配置"""
+        self._runtime_config = config
+
+    def clear_runtime_config(self) -> None:
+        """清理运行时配置"""
+        self._runtime_config = None
+
+    def build_config(self, obsidian_vault_path: str, api_key: str, model_name: str, prompts: dict[str, dict[str, str]] | None = None) -> ConfigModel:
+        """
+        构建配置对象（不写入磁盘）
+
+        Args:
+            obsidian_vault_path: Obsidian Vault 绝对路径
+            api_key: API密钥
+            model_name: 模型名称
+            prompts: 提示词配置（可选）
+
+        Returns:
+            ConfigModel: 配置对象
+
+        Raises:
+            ConfigError: 配置数据验证失败时抛出
+        """
+        try:
+            config_data = {
+                "obsidian_vault_path": obsidian_vault_path,
+                "api_key": api_key,
+                "model_name": model_name
+            }
+            if prompts is not None:
+                config_data["prompts"] = prompts
+            return ConfigModel(**config_data)
+        except ValidationError as e:
+            raise ConfigError(f"配置数据验证失败: {e}")
+
+    def save_config(self, config: ConfigModel) -> None:
+        """
+        将配置写入磁盘
+
+        Args:
+            config: 配置对象
+
+        Raises:
+            ConfigError: 配置写入失败时抛出
+        """
+        self._ensure_config_dir()
+
+        try:
+            with open(self.config_file, 'w', encoding='utf-8') as f:
+                json.dump(config.model_dump(), f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            raise ConfigError(f"写入配置文件失败: {e}")
+
     def write_config(self, obsidian_vault_path: str, api_key: str, model_name: str, prompts: dict[str, dict[str, str]] | None = None) -> ConfigModel:
         """
         写入配置文件
@@ -72,26 +134,8 @@ class ConfigManager:
         Raises:
             ConfigError: 配置写入失败时抛出
         """
-        self._ensure_config_dir()
-
-        try:
-            config_data = {
-                "obsidian_vault_path": obsidian_vault_path,
-                "api_key": api_key,
-                "model_name": model_name
-            }
-            if prompts:
-                config_data["prompts"] = prompts
-            config = ConfigModel(**config_data)
-        except ValidationError as e:
-            raise ConfigError(f"配置数据验证失败: {e}")
-
-        try:
-            with open(self.config_file, 'w', encoding='utf-8') as f:
-                json.dump(config.model_dump(), f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            raise ConfigError(f"写入配置文件失败: {e}")
-
+        config = self.build_config(obsidian_vault_path, api_key, model_name, prompts)
+        self.save_config(config)
         return config
     
     def delete_config(self) -> bool:

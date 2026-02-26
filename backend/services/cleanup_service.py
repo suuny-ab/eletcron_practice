@@ -27,7 +27,8 @@ class SessionCleanupService:
             sessions_dir: 会话记录目录
         """
         backend_dir = Path(__file__).resolve().parents[1]
-        self.sessions_dir = sessions_dir or (backend_dir / "ai_engine" / "data" / "ai_sessions")
+        self.sessions_dir = sessions_dir or (backend_dir / ".data" / "ai_sessions")
+
         self.notes_root = notes_root
 
     async def cleanup_orphaned_sessions(self) -> int:

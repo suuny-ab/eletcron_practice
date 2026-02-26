@@ -33,13 +33,25 @@ class FileWatcherHandler(FileSystemEventHandler):
         if file_path in self._debounce_timers:
             self._debounce_timers[file_path].cancel()
 
+        def _run_callback():
+            try:
+                self.on_change_callback(file_path, event_type)
+            finally:
+                self._debounce_timers.pop(file_path, None)
+
         # 创建新的定时器
         timer = Timer(
             WATCHDOG_DEBOUNCE_MS / 1000.0,
-            lambda: self.on_change_callback(file_path, event_type)
+            _run_callback
         )
         self._debounce_timers[file_path] = timer
         timer.start()
+
+    def clear_debounce_timers(self):
+        """清理所有防抖定时器"""
+        for timer in self._debounce_timers.values():
+            timer.cancel()
+        self._debounce_timers.clear()
 
     def on_created(self, event: FileCreatedEvent):
         """文件创建事件"""
@@ -77,5 +89,6 @@ class FileWatcher:
 
     def stop(self):
         """停止监听"""
+        self.handler.clear_debounce_timers()
         self.observer.stop()
         self.observer.join()

@@ -11,19 +11,26 @@ const getBackendPaths = () => {
   const resourcesRoot = isDev ? __dirname : path.join(process.resourcesPath, 'app.asar.unpacked')
   const backendRoot = path.join(resourcesRoot, 'backend')
   const pythonRoot = isDev ? path.join(__dirname, 'python') : path.join(process.resourcesPath, 'python')
-  const pyDepsRoot = path.join(backendRoot, '.pydeps')
+  const pyDepsRoot = isDev ? null : path.join(backendRoot, '.pydeps')  // 开发环境使用虚拟环境
   return { isDev, resourcesRoot, backendRoot, pythonRoot, pyDepsRoot }
 }
 
 const resolvePythonCmd = (pythonRoot, isPackaged) => {
+  // 开发环境：优先使用 backend 目录下的虚拟环境
+  if (!isPackaged) {
+    const venvPython = path.join(__dirname, 'backend', '.venv', 'Scripts', 'python.exe')
+    if (fs.existsSync(venvPython)) {
+      return venvPython
+    }
+    return process.env.PYTHON_PATH || 'python'
+  }
+
+  // 生产环境：使用嵌入式 Python
   const embeddedPython = path.join(pythonRoot, 'python.exe')
   if (fs.existsSync(embeddedPython)) {
     return embeddedPython
   }
-  if (isPackaged) {
-    return null
-  }
-  return process.env.PYTHON_PATH || 'python'
+  return null
 }
 
 
@@ -108,6 +115,9 @@ const startBackend = () => {
   }
 
   console.log(`使用 Python: ${pythonCmd}`)
+  console.log(`当前目录: ${resourcesRoot}`)
+  console.log(`PYTHONPATH: ${env.PYTHONPATH}`)
+  console.log(`PYTHONHOME: ${env.PYTHONHOME}`)
 
 
   backendProcess = spawn(

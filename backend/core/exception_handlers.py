@@ -3,7 +3,7 @@
 """
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
+from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from .exceptions import BaseBusinessException
@@ -65,6 +65,32 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
+async def response_validation_exception_handler(request: Request, exc: ResponseValidationError):
+    """
+    处理响应数据验证异常
+
+    Args:
+        request: 请求对象
+        exc: 响应验证异常
+
+    Returns:
+        JSONResponse: 错误响应
+    """
+    log_exception(exc, f"响应数据验证失败 | 路径: {request.url.path}")
+
+    is_dev = bool(getattr(request.app, "debug", False))
+    message = "响应数据验证失败" if not is_dev else str(exc)
+
+    return JSONResponse(
+        status_code=500,
+        content=ErrorResponse(
+            success=False,
+            message=message,
+            error_code="RESPONSE_VALIDATION_ERROR"
+        ).model_dump()
+    )
+
+
 async def business_exception_handler(request: Request, exc: BaseBusinessException):
     """
     处理自定义业务异常
@@ -102,8 +128,7 @@ async def generic_exception_handler(request: Request, exc: Exception):
     log_exception(exc, f"未捕获的异常 | 路径: {request.url.path}")
 
     # 生产环境不返回详细错误信息，开发环境返回
-    from ..main import app
-    is_dev = app.debug
+    is_dev = bool(getattr(request.app, "debug", False))
 
     message = "服务器内部错误" if not is_dev else str(exc)
 
@@ -134,6 +159,9 @@ def register_exception_handlers(app):
     # 注册请求验证异常处理器
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(ValidationError, validation_exception_handler)
+
+    # 注册响应验证异常处理器
+    app.add_exception_handler(ResponseValidationError, response_validation_exception_handler)
 
     # 注册通用异常处理器（必须最后注册，作为兜底）
     app.add_exception_handler(Exception, generic_exception_handler)

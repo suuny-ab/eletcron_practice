@@ -8,27 +8,27 @@ AI处理器基类 - 统一处理所有AI功能
 from typing import final
 from collections.abc import AsyncGenerator
 
-from .core import AIEngine
-from .config import PromptConfigFactory
-from .memory.session_resolver import SessionResolver
-from .template import TemplateBuilder
-from .history import HistoryManager
+from ..llm.chat_model import ChatModelService
+from ..llm.history import HistoryManager
+from ..llm.memory.session_resolver import SessionResolver
+from ..llm.template import TemplateBuilder
+from ..prompts.prompt_config import PromptConfigFactory
 
 
 @final
-class AIProcessor:
+class BaseProcessor:
     """通用AI处理器 - 通过任务类型处理不同功能"""
 
-    def __init__(self, task_type: str, ai_engine: AIEngine):
+    def __init__(self, task_type: str, chat_model_service: ChatModelService):
         """
         初始化处理器
 
         Args:
             task_type: 任务类型 ('optimize', 'advise', 'edit')
-            ai_engine: AI 引擎实例
+            chat_model_service: 聊天模型服务实例
         """
         self.task_type = task_type
-        self.ai_engine = ai_engine
+        self.chat_model_service = chat_model_service
         self.config = PromptConfigFactory.get_config(task_type)
         self.template_builder = TemplateBuilder()
         self.session_resolver = SessionResolver()
@@ -44,10 +44,10 @@ class AIProcessor:
 
         if task_type == "advise":
             self.history_input_key = "question"
-            self.history_manager = HistoryManager(self.ai_engine)
+            self.history_manager = HistoryManager(self.chat_model_service)
         elif task_type == "edit":
             self.history_input_key = "requirement"
-            self.history_manager = HistoryManager(self.ai_engine)
+            self.history_manager = HistoryManager(self.chat_model_service)
 
     async def process_stream(self, **kwargs) -> AsyncGenerator[str, None]:
         """
@@ -74,7 +74,7 @@ class AIProcessor:
         messages = self.template.format_messages(**kwargs)
 
         # 流式生成
-        async for chunk in self.ai_engine.stream_generate(messages):
+        async for chunk in self.chat_model_service.stream_generate(messages):
             yield chunk
 
     async def process_stream_with_history(self, **kwargs) -> AsyncGenerator[str, None]:
@@ -95,7 +95,7 @@ class AIProcessor:
                 raise ValueError(f"缺少必需参数: {param}")
 
         # 构建基础链
-        base_chain = self.template | self.ai_engine.chat_model | self.ai_engine.output_parser
+        base_chain = self.template | self.chat_model_service.chat_model | self.chat_model_service.output_parser
 
         # 创建带历史的链
         chain_with_history = self.history_manager.create_chain_with_history(
