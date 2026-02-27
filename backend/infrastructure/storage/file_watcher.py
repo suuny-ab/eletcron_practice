@@ -6,7 +6,7 @@ from pathlib import Path
 from threading import Timer
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent, FileModifiedEvent, FileDeletedEvent
-from .config import WATCHDOG_DEBOUNCE_MS, SUPPORTED_EXTENSIONS
+from ...domain.knowledge.rag.config import WATCHDOG_DEBOUNCE_MS, SUPPORTED_EXTENSIONS
 
 
 class FileWatcherHandler(FileSystemEventHandler):

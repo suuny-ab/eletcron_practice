@@ -5,7 +5,7 @@
 import re
 from collections.abc import Iterable
 from typing import Any, Literal, TypedDict, cast
-from .config import (
+from ...domain.knowledge.rag.config import (
     CHUNK_OVERLAP,
     CHUNK_SIZE,
     MARKDOWN_HEADERS_TO_SPLIT_ON,

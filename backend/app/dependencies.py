@@ -3,13 +3,14 @@
 """
 from fastapi import Request
 
-from domain.ai.models.model_provider import ModelProvider
-from domain.ai.services.chat_model import ChatModelService
-from domain.ai.services.llm_task_service import LLMTaskService
-from domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
+from ..domain.ai.models.model_provider import ModelProvider
+from ..domain.ai.services.chat_model import ChatModelService
+from ..domain.ai.services.llm_task_service import LLMTaskService
+from ..domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
 from .services import AIService, SessionCleanupService
-from domain.knowledge.services.knowledge_service import KnowledgeService
-from infrastructure.config.config_context import ConfigContext
+from ..domain.knowledge.services.knowledge_service import KnowledgeService
+from ..infrastructure.config.config_context import ConfigContext
+
 
 
 

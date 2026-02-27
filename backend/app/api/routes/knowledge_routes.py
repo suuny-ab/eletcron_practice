@@ -4,8 +4,8 @@
 """
 from fastapi import APIRouter, Depends
 from ...dependencies import get_knowledge_service
-from schemas.responses import DataResponse, FileTreeData, FileReadResult, FileWriteResult
-from schemas.requests import FileUpdateRequest
+from ....schemas.responses import DataResponse, FileTreeData, FileReadResult, FileWriteResult
+from ....schemas.requests import FileUpdateRequest
 
 # 创建路由器
 router = APIRouter(prefix="/knowledge", tags=["知识库"])

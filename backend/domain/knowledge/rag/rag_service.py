@@ -20,11 +20,11 @@ from .config import (
     VECTOR_WEIGHT,
     BM25_WEIGHT,
 )
-from infrastructure.storage.document_processor import DocumentProcessor
-from infrastructure.storage.file_watcher import FileWatcher
-from domain.ai.models.model_provider import ModelProvider
-from domain.ai.services.llm_task_service import LLMTaskService
-from infrastructure.logging.logger import get_logger
+from ....infrastructure.storage.document_processor import DocumentProcessor
+from ....infrastructure.storage.file_watcher import FileWatcher
+from ...ai.models.model_provider import ModelProvider
+from ...ai.services.llm_task_service import LLMTaskService
+from ....infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
 

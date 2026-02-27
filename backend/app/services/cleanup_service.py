@@ -5,7 +5,8 @@
 from pathlib import Path
 from typing import Optional
 
-from infrastructure.logging.logger import get_logger
+from ...infrastructure.logging.logger import get_logger
+
 
 
 logger = get_logger(__name__)

@@ -10,15 +10,16 @@ from .api.routes import ai_router, config_router, knowledge_router
 
 
 # 导入全局异常处理器
-from core import register_exception_handlers
-from infrastructure.logging.logger import get_logger
-from infrastructure.config.config_context import ConfigContext
+from ..core import register_exception_handlers
+from ..infrastructure.logging.logger import get_logger
+from ..infrastructure.config.config_context import ConfigContext
 
 # 导入配置管理器
-from infrastructure.config.config_manager import config_manager
+from ..infrastructure.config.config_manager import config_manager
 
 # 导入模型提供者
-from domain.ai.models.model_provider import ModelProvider
+from ..domain.ai.models.model_provider import ModelProvider
+
 
 # 导入 AI 服务
 from .services.ai_service import AIService

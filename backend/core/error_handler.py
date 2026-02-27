@@ -1,7 +1,7 @@
 """
 统一异常处理工具 - 提供一致的异常日志记录逻辑
 """
-from infrastructure.logging.logger import get_logger
+from ..infrastructure.logging.logger import get_logger
 from .exceptions import BaseBusinessException
 
 logger = get_logger(__name__)

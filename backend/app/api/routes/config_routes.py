@@ -4,11 +4,11 @@
 """
 from fastapi import APIRouter, Request
 
-from infrastructure.config.config_manager import config_manager
-from schemas.requests import UpdateConfigRequest
-from schemas.responses import DataResponse, BaseResponse, ConfigData
-from infrastructure.logging.logger import get_logger
-from core.exceptions import NotFoundException, ConfigError
+from ....infrastructure.config.config_manager import config_manager
+from ....schemas.requests import UpdateConfigRequest
+from ....schemas.responses import DataResponse, BaseResponse, ConfigData
+from ....infrastructure.logging.logger import get_logger
+from ....core.exceptions import NotFoundException, ConfigError
 
 
 logger = get_logger(__name__)
