@@ -5,8 +5,8 @@
 from fastapi import APIRouter, Request
 
 from infrastructure.config.config_context import ConfigModel
-from schemas.requests import UpdateConfigRequest
-from schemas.responses import DataResponse, BaseResponse, ConfigData
+from app.schemas.requests import UpdateConfigRequest
+from app.schemas.responses import DataResponse, BaseResponse, ConfigData
 from infrastructure.logging.logger import get_logger
 from core.exceptions import NotFoundException, ConfigError
 

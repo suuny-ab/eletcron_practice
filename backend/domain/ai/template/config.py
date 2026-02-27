@@ -1,4 +1,7 @@
-"""提示词配置模块"""
+"""
+提示词配置模块
+定义各类任务的提示词模板
+"""
 from typing import Optional
 import copy
 from pydantic import BaseModel, Field

@@ -2,7 +2,7 @@
 知识库服务层 - 对外提供知识库业务能力
 """
 from ..repositories.knowledge_repository import KnowledgeRepository
-from schemas.responses import FileTreeData, FileReadResult, FileWriteResult
+from app.schemas.responses import FileTreeData, FileReadResult, FileWriteResult
 from core.interfaces import IKnowledgeService, IKnowledgeRepository
 
 

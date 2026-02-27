@@ -11,7 +11,7 @@ from langchain_core.messages import BaseMessage
 from .chat_model import ChatModelService
 from ..history import HistoryManager
 from ..template import TemplateBuilder
-from prompts.prompt_config import PromptConfigFactory
+from ..template.config import PromptConfigFactory
 from core.interfaces import ILLMTaskService, IChatModelService
 from core.exceptions import ValidationException
 from infrastructure.metrics import get_metrics

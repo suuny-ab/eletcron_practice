@@ -150,7 +150,7 @@ def _register_config_listeners(app: FastAPI):
     # 监听器 2：更新提示词配置
     def update_prompts(config):
         """更新提示词配置"""
-        from prompts.prompt_config import PromptConfigFactory
+        from domain.ai.template.config import PromptConfigFactory
         previous_custom_prompts = PromptConfigFactory.snapshot_custom_configs()
         
         if hasattr(config, 'prompts') and config.prompts:

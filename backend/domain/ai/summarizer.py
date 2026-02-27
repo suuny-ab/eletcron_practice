@@ -6,7 +6,7 @@ from typing import Awaitable, Callable
 
 from langchain_core.messages import BaseMessage, SystemMessage, HumanMessage
 
-from prompts.prompt_config import PromptConfigFactory
+from ..template.config import PromptConfigFactory
 
 
 class Summarizer:

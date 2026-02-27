@@ -7,7 +7,7 @@ from starlette.responses import StreamingResponse
 
 from app.services import AIService
 from app.dependencies import get_ai_service, get_rag_service
-from schemas import ChatRequest, OptimizeRequest, EditRequest, RAGRequest
+from app.schemas import ChatRequest, OptimizeRequest, EditRequest, RAGRequest
 
 from utils import create_json_stream
 from core.exceptions import ValidationException

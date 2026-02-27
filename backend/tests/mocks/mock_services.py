@@ -48,7 +48,7 @@ class MockKnowledgeRepository(IKnowledgeRepository):
     """Mock 知识库仓储"""
 
     def read_file(self, relative_path: str):
-        from schemas.responses import FileReadResult
+        from app.schemas.responses import FileReadResult
         return FileReadResult(
             success=True,
             filename="test.md",
@@ -58,7 +58,7 @@ class MockKnowledgeRepository(IKnowledgeRepository):
         )
 
     def write_file(self, relative_path: str, content: str):
-        from schemas.responses import FileWriteResult
+        from app.schemas.responses import FileWriteResult
         return FileWriteResult(
             success=True,
             filename="test.md",
@@ -71,7 +71,7 @@ class MockKnowledgeRepository(IKnowledgeRepository):
         return Path("/mock/vault")
 
     def get_file_tree(self) -> list:
-        from schemas.responses import FileTreeNode
+        from app.schemas.responses import FileTreeNode
         return [
             FileTreeNode(
                 key="test.md",

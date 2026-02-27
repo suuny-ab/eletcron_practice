@@ -100,4 +100,3 @@ class RAGAnswer(BaseModel):
     """RAG 问答回答"""
     answer: str
     sources: list[RAGSource] = Field(default_factory=list)
-

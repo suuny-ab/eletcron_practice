@@ -8,7 +8,7 @@ from pathlib import Path
 from infrastructure.config.config_context import ConfigContext
 from core.exceptions import NotFoundException, ValidationException, ConfigError
 from core.interfaces import IKnowledgeRepository, IConfigContext
-from schemas.responses import FileReadResult, FileWriteResult, FileTreeNode
+from app.schemas.responses import FileReadResult, FileWriteResult, FileTreeNode
 
 
 

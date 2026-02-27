@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError, ResponseValidationError
 from pydantic import ValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from .exceptions import BaseBusinessException
-from schemas.responses import ErrorResponse
+from app.schemas.responses import ErrorResponse
 from infrastructure.logging.logger import get_logger
 from .error_handler import log_exception
 
