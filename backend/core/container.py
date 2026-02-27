@@ -53,7 +53,7 @@ class Container:
     def __init__(self):
         self._services: Dict[Type, ServiceDescriptor] = {}
         self._singleton_instances: Dict[Type, Any] = {}
-        self._instance_lock = threading.Lock()  # 保护单例实例创建
+        self._instance_lock = threading.RLock()  # 可重入锁，支持嵌套调用
         self._registration_lock = threading.Lock()  # 保护服务注册
     
     def register(
@@ -168,6 +168,7 @@ class Container:
         Returns:
             bool: 是否成功失效（如果服务不存在返回 False）
         """
+        # 使用可重入锁，允许在 resolve 过程中调用
         with self._instance_lock:
             if interface not in self._services:
                 return False
