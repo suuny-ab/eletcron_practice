@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { Tree, Card, message, Spin, Typography, Empty, Layout, Button, Space, Tag, Input, Select, Tabs, Collapse } from 'antd';
-import { FolderOutlined, FileOutlined, ReloadOutlined, FolderOpenOutlined, EditOutlined, CheckOutlined, CloseOutlined, SendOutlined, BgColorsOutlined, EditOutlined as EditOutlined2, ThunderboltOutlined, MenuUnfoldOutlined, MenuFoldOutlined, SearchOutlined, FileTextOutlined } from '@ant-design/icons';
+import { FolderOutlined, FileOutlined, ReloadOutlined, FolderOpenOutlined, EditOutlined, CheckOutlined, CloseOutlined, SendOutlined, BgColorsOutlined, EditOutlined as EditOutlined2, ThunderboltOutlined, MenuUnfoldOutlined, MenuFoldOutlined, SearchOutlined, FileTextOutlined, BugOutlined, DashboardOutlined } from '@ant-design/icons';
 import { getFileTree, getFileContent, updateFileContent } from '../api/knowledge';
 import { aiAdvise, aiEdit, aiOptimize, ragAskStream, readEventStream } from '../api/ai';
 import ConfigPage from './Config';
+import { RAGDebugPanel, MetricsDashboard } from '../components/RAGDebug';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -1123,13 +1124,48 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
               <Text strong>
                 {previewMode ? 'AI 排版预览' : 
                  (aiMode === 'advise' ? 'AI 建议' : 
-                  aiMode === 'edit' ? 'AI 编辑' : '知识库问答')}
+                  aiMode === 'edit' ? 'AI 编辑' : 
+                  aiMode === 'debug' ? 'RAG 调试' :
+                  aiMode === 'metrics' ? '指标监控' : '知识库问答')}
               </Text>
               <Space size="small">
                 {(aiGenerating || ragLoading) && <span style={{ color: '#1890ff' }}>(生成中...)</span>}
               </Space>
             </div>
-            {previewMode ? (
+            {/* 调试/指标模式：独立布局，模式选择器固定在顶部 */}
+            {(aiMode === 'debug' || aiMode === 'metrics') ? (
+              <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                {/* 模式选择器固定栏 */}
+                <div style={{ padding: '8px 16px', borderBottom: '1px solid #f0f0f0', background: '#fafafa' }}>
+                  <Select
+                    value={aiMode}
+                    onChange={setAiMode}
+                    style={{ width: 130 }}
+                    size="small"
+                  >
+                    <Select.Option value="advise">
+                      <Space size="small"><ThunderboltOutlined />AI 建议</Space>
+                    </Select.Option>
+                    <Select.Option value="edit">
+                      <Space size="small"><EditOutlined2 />AI 编辑</Space>
+                    </Select.Option>
+                    <Select.Option value="rag">
+                      <Space size="small"><SearchOutlined />知识库问答</Space>
+                    </Select.Option>
+                    <Select.Option value="debug">
+                      <Space size="small"><BugOutlined />RAG 调试</Space>
+                    </Select.Option>
+                    <Select.Option value="metrics">
+                      <Space size="small"><DashboardOutlined />指标监控</Space>
+                    </Select.Option>
+                  </Select>
+                </div>
+                {/* 面板内容区（可滚动） */}
+                <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+                  {aiMode === 'debug' ? <RAGDebugPanel /> : <MetricsDashboard />}
+                </div>
+              </div>
+            ) : previewMode ? (
               /* 预览模式：显示AI编辑后的内容 */
               <div style={{ height: '100%', minHeight: 0, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ flex: 1, minHeight: 0, padding: '16px', overflow: 'auto' }}>
@@ -1455,7 +1491,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                 </Space>
               </div>
 
-              {/* 下方 1/3：输入区域 */}
+              {/* 下方：输入区域 */}
               <div style={{
                 flex: 1,
                 padding: '16px',
@@ -1509,6 +1545,18 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                         知识库问答
                       </Space>
                     </Select.Option>
+                    <Select.Option value="debug">
+                      <Space size="small">
+                        <BugOutlined />
+                        RAG 调试
+                      </Space>
+                    </Select.Option>
+                    <Select.Option value="metrics">
+                      <Space size="small">
+                        <DashboardOutlined />
+                        指标监控
+                      </Space>
+                    </Select.Option>
                   </Select>
 
                   {/* RAG 模式的 top_k 选择器 */}
@@ -1526,7 +1574,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                     </Select>
                   )}
 
-                  {/* 一键排版按钮（非 RAG 模式显示） */}
+                  {/* 一键排版按钮（仅 advise/edit 模式显示） */}
                   {aiMode !== 'rag' && (
                     <Button
                       type="primary"

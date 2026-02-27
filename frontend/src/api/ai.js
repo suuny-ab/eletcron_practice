@@ -171,3 +171,32 @@ export async function ragAskStream(question, topK = 3, signal) {
 
   return response.body;
 }
+
+/**
+ * RAG 调试接口 - 获取详细检索步骤信息
+ * @param {string} question - 用户问题
+ * @param {number} topK - 检索的文档数量
+ * @param {AbortSignal} signal - 中断信号
+ * @returns {Promise<Object>} 调试信息
+ */
+export async function ragDebug(question, topK = 3, signal) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/rag/debug`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question, top_k: topK }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || 'RAG 调试请求失败');
+  }
+
+  return result.data;
+}

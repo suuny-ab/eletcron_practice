@@ -105,6 +105,10 @@ class RAGService(IRAGService):
         """检索上下文"""
         return self._retrieval_service.retrieve_context(question, top_k)
 
+    def retrieve_sources_debug(self, question: str, top_k: int = 3) -> dict:
+        """带调试信息的检索（用于可视化调试面板）"""
+        return self._retrieval_service.retrieve_sources_debug(question, top_k)
+
     # ==================== 属性访问（供外部直接访问子服务） ====================
 
     @property

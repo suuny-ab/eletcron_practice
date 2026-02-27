@@ -59,6 +59,14 @@ class IRAGService(Protocol):
         """检索上下文"""
         ...
     
+    def retrieve_sources_debug(
+        self,
+        question: str,
+        top_k: int = 3
+    ) -> dict:
+        """带调试信息的检索（用于可视化调试面板）"""
+        ...
+    
     def start_watcher(self) -> None:
         """启动文件监听器"""
         ...

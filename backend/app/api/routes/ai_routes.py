@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app.services import AIService
 from app.dependencies import get_ai_service, get_rag_service
-from app.schemas import ChatRequest, OptimizeRequest, EditRequest, RAGRequest
+from app.schemas import ChatRequest, OptimizeRequest, EditRequest, RAGRequest, DataResponse, RAGDebugInfo
 from utils import create_streaming_response, require_param, validate_service
 
 
@@ -98,4 +98,30 @@ async def rag_answer(
         rag_service,
         question,
         request.top_k
+    )
+
+
+@router.post("/rag/debug", response_model=DataResponse[RAGDebugInfo])
+async def rag_debug(
+    request: RAGRequest,
+    rag_service = Depends(get_rag_service)
+):
+    """
+    RAG 调试接口 - 返回详细的检索步骤信息
+
+    用于可视化展示 RAG 检索流程：
+    1. 向量检索结果（距离、相似度、归一化得分）
+    2. BM25检索结果（分词、原始得分、归一化得分）
+    3. 混合候选（来源标记、混合得分计算）
+    4. LLM重排序结果（排名变化、是否选中）
+    5. 各阶段耗时统计
+    """
+    question = require_param(request.question, "question")
+    validate_service(rag_service, "RAG")
+
+    debug_info = rag_service.retrieve_sources_debug(question, request.top_k)
+
+    return DataResponse(
+        data=RAGDebugInfo(**debug_info),
+        message="RAG 调试信息获取成功"
     )

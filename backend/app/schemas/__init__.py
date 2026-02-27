@@ -15,6 +15,12 @@ from .responses import (
     FileWriteResult,
     RAGSource,
     RAGAnswer,
+    # RAG 调试响应模型
+    VectorSearchResult,
+    BM25SearchResult,
+    HybridCandidate,
+    RerankResult,
+    RAGDebugInfo,
 )
 from .stream_models import StreamChunk, StreamComplete, StreamError
 
@@ -38,6 +44,12 @@ __all__ = [
     'FileWriteResult',
     'RAGSource',
     'RAGAnswer',
+    # RAG 调试响应模型
+    'VectorSearchResult',
+    'BM25SearchResult',
+    'HybridCandidate',
+    'RerankResult',
+    'RAGDebugInfo',
 
     # 流式模型
     'StreamChunk',
