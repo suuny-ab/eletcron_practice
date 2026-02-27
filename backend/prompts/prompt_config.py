@@ -92,6 +92,20 @@ class RagQaConfig(PromptConfig):
     params: list[str] = ['context', 'question']
 
 
+class RerankConfig(PromptConfig):
+    """检索重排序配置"""
+    system: str = """
+你是一个检索重排序助手。根据用户问题，从候选文本中选出最相关的若干条。
+仅输出JSON数组，元素是候选的索引（整数），按相关性从高到低排序。"""
+    human: str = """
+问题：{question}
+需要返回数量：{top_k}
+候选列表：
+{candidates}
+"""
+    params: list[str] = ['question', 'top_k', 'candidates']
+
+
 class SummaryConfig(PromptConfig):
     """对话摘要配置"""
     system: str = """
@@ -115,6 +129,7 @@ class PromptConfigFactory:
         'advise': AdviseConfig(),
         'edit': EditConfig(),
         'rag_qa': RagQaConfig(),
+        'rerank': RerankConfig(),
         'summary': SummaryConfig()
     }
 
@@ -169,7 +184,7 @@ class PromptConfigFactory:
             {task_type: {system, human, is_custom}}
         """
         result = {}
-        for task_type in ['optimize', 'advise', 'edit', 'rag_qa', 'summary']:
+        for task_type in ['optimize', 'advise', 'edit', 'rag_qa', 'rerank', 'summary']:
             config = cls.get_config(task_type)
             is_custom = task_type in cls._custom_configs
             result[task_type] = {

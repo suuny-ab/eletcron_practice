@@ -22,6 +22,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [openNotes, setOpenNotes] = useState([]);
+  const [openChunks, setOpenChunks] = useState([]);
   const [noteStates, setNoteStates] = useState({});
   const [activeMainTab, setActiveMainTab] = useState('notes');
 
@@ -40,6 +41,8 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
   const [ragSources, setRagSources] = useState([]);
   const [ragTopK, setRagTopK] = useState(3);
   const [ragLoading, setRagLoading] = useState(false);
+  const [currentRagQueryId, setCurrentRagQueryId] = useState(0);
+  const ragQueryIdRef = useRef(0);
 
   const noteDefaults = {
     content: '',
@@ -241,56 +244,31 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     }
   };
 
-  // 处理引用来源卡片点击
-  const handleFileSelect = async (filename) => {
-    // 1. 在文件树中展开并定位该文件
-    findAndExpandPath(filename);
-
-    // 2. 高亮选中的文件
-    setSelectedKeys([filename]);
-
-    // 3. 打开文件标签页
-    const noteKey = filename;
-    const tabKey = `note:${noteKey}`;
-
-    // 检查文件扩展名
-    const isMarkdown = filename.toLowerCase().endsWith('.md');
-    if (!isMarkdown) {
-      message.warning('仅支持预览 Markdown 格式文件');
+  const openRagChunk = (source, index) => {
+    if (!source) {
+      message.warning('暂无分块内容');
       return;
     }
 
-    // 添加到打开的标签页
-    setOpenNotes(prev => {
-      if (prev.some(note => note.key === noteKey)) {
+    const filename = source.filename || '未命名';
+    const title = `${index + 1}. ${filename.split('/').pop()}`;
+    const chunkKey = `chunk:${currentRagQueryId}:${index}`;
+    const chunkTab = {
+      key: chunkKey,
+      title,
+      content: source.content || '',
+      score: source.score,
+      filename,
+      order: index + 1,
+    };
+
+    setOpenChunks(prev => {
+      if (prev.some(chunk => chunk.key === chunkKey)) {
         return prev;
       }
-      const title = filename.split('/').pop();
-      return [...prev, { key: noteKey, title }];
+      return [...prev, chunkTab];
     });
-
-    // 切换到该标签页
-    setActiveMainTab(tabKey);
-
-    // 加载文件内容
-    const cachedState = noteStates[noteKey];
-    if (!cachedState?.hasLoaded) {
-      updateNoteState(noteKey, { contentLoading: true, isEditing: false });
-      try {
-        const response = await getFileContent(noteKey);
-        const content = response.data?.content || '';
-        updateNoteState(noteKey, {
-          content,
-          editContent: content,
-          contentLoading: false,
-          hasLoaded: true,
-        });
-        message.success(`已打开: ${filename}`);
-      } catch (error) {
-        updateNoteState(noteKey, { contentLoading: false });
-        message.error('读取文件失败: ' + (error.response?.data?.message || error.message));
-      }
-    }
+    setActiveMainTab(chunkKey);
   };
 
   const getNoteState = (noteKey) => noteStates[noteKey] || noteDefaults;
@@ -341,8 +319,14 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
       setRagMessages(prev => [...prev, { role: 'user', content: question }]);
       // 添加空的 AI 响应消息
       setRagMessages(prev => [...prev, { role: 'assistant', content: '' }]);
-      // 清空来源
+
+      const nextQueryId = ragQueryIdRef.current + 1;
+      ragQueryIdRef.current = nextQueryId;
+      setCurrentRagQueryId(nextQueryId);
+
+      // 清空来源与分块标签
       setRagSources([]);
+      setOpenChunks([]);
 
       // 创建 AbortController 用于中断请求
       abortControllerRef.current = new AbortController();
@@ -352,6 +336,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
 
         // 流式读取响应
         let currentAnswer = '';
+        const sources = [];
         for await (const event of readEventStream(stream, abortControllerRef.current.signal)) {
           if (event.type === 'chunk' && event.content) {
             currentAnswer += event.content;
@@ -365,9 +350,12 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
               return newMessages;
             });
           } else if (event.type === 'source' && event.data) {
+            sources.push(event.data);
             setRagSources(prev => [...prev, event.data]);
           }
         }
+
+        // 不自动打开分块标签页，等待用户点击
       } catch (error) {
         if (error.name === 'AbortError') {
           message.info('已取消请求');
@@ -622,6 +610,8 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
             setActiveMainTab('config');
           } else if (next.length > 0) {
             setActiveMainTab(`note:${next[next.length - 1].key}`);
+          } else if (openChunks.length > 0) {
+            setActiveMainTab(openChunks[openChunks.length - 1].key);
           } else {
             setActiveMainTab('notes');
           }
@@ -631,6 +621,25 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
       setNoteStates(prev => {
         const next = { ...prev };
         delete next[noteKey];
+        return next;
+      });
+      return;
+    }
+
+    if (targetKey.startsWith('chunk:')) {
+      setOpenChunks(prev => {
+        const next = prev.filter(chunk => chunk.key !== targetKey);
+        if (activeMainTab === targetKey) {
+          if (configTabVisible) {
+            setActiveMainTab('config');
+          } else if (next.length > 0) {
+            setActiveMainTab(next[next.length - 1].key);
+          } else if (openNotes.length > 0) {
+            setActiveMainTab(`note:${openNotes[openNotes.length - 1].key}`);
+          } else {
+            setActiveMainTab('notes');
+          }
+        }
         return next;
       });
     }
@@ -790,6 +799,62 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     );
   };
 
+  const renderChunkTab = (chunk) => (
+    <Card
+      title={
+        <Space>
+          <FileTextOutlined style={{ color: '#52c41a' }} />
+          <Text strong style={{ fontSize: 16 }}>Top {chunk.order}</Text>
+          <Tag color="green">分块</Tag>
+        </Space>
+      }
+      extra={
+        <Space>
+          <Text type="secondary">{chunk.filename}</Text>
+          {typeof chunk.score === 'number' && (
+            <Tag color="blue">{(chunk.score * 100).toFixed(0)}%</Tag>
+          )}
+        </Space>
+      }
+      bordered={false}
+      style={{
+        height: '100%',
+        borderRadius: 0,
+        boxShadow: 'none',
+      }}
+      bodyStyle={{
+        padding: '24px',
+        height: 'calc(100% - 60px)',
+        overflow: 'auto',
+      }}
+    >
+      {chunk.content ? (
+        <div style={{
+          padding: '20px',
+          backgroundColor: '#fff',
+          borderRadius: '8px',
+        }}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={[rehypeHighlight, rehypeRaw]}
+          >
+            {chunk.content}
+          </ReactMarkdown>
+        </div>
+      ) : (
+        <Empty
+          description={
+            <Space direction="vertical" size="small">
+              <Paragraph type="secondary">分块内容为空</Paragraph>
+            </Space>
+          }
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          style={{ marginTop: 80 }}
+        />
+      )}
+    </Card>
+  );
+
   const noteTabs = openNotes.map(note => ({
     key: `note:${note.key}`,
     label: note.title || note.key,
@@ -797,8 +862,18 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     children: renderNoteTab(note.key),
   }));
 
+  const chunkTabs = openChunks.map(chunk => ({
+    key: chunk.key,
+    label: chunk.title,
+    closable: true,
+    children: renderChunkTab(chunk),
+  }));
+
+  const contentTabs = [...noteTabs, ...chunkTabs];
+  const hasContentTabs = contentTabs.length > 0;
+
   const tabItems = [
-    ...(openNotes.length > 0 ? noteTabs : [{
+    ...(hasContentTabs ? contentTabs : [{
       key: 'notes',
       label: '笔记',
       closable: false,
@@ -1253,7 +1328,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
                                         extra={source.score && <Tag color="blue">{(source.score * 100).toFixed(0)}%</Tag>}
                                         style={{ marginBottom: 8, cursor: 'pointer' }}
                                         hoverable
-                                        onClick={() => handleFileSelect(source.filename)}
+                                        onClick={() => openRagChunk(source, i)}
                                       >
                                         <Text ellipsis={{ rows: 2 }} style={{ fontSize: 12, color: '#666' }}>
                                           {source.content}

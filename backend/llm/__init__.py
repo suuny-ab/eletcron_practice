@@ -8,6 +8,7 @@ from . import memory
 from . import template
 from .chat_model import ChatModelService
 from .summarizer import Summarizer
+from .llm_task_service import LLMTaskService
 
 __all__ = [
     'history',
@@ -15,4 +16,5 @@ __all__ = [
     'template',
     'ChatModelService',
     'Summarizer',
+    'LLMTaskService',
 ]

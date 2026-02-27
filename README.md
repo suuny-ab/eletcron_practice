@@ -54,69 +54,54 @@
 
 ```
 test/
-├── backend/              # Python 后端（36 个核心文件）
-│   ├── main.py          # FastAPI 应用入口，路由注册，生命周期管理
-│   ├── requirements.txt # Python 依赖清单
-│   ├── ai_engine/       # AI 核心引擎
-│   │   ├── core.py      # AI 引擎核心（通义千问调用）
-│   │   ├── base_handler.py  # AI 处理器基类
-│   │   ├── config/      # 提示词配置
-│   │   │   └── prompt_config.py       # 提示词管理（热加载支持）
-│   │   ├── memory/      # 对话记忆模块
-│   │   │   ├── chat_history.py      # 会话持久化存储（JSONL）
-│   │   │   ├── session_resolver.py   # 会话 ID 解析
-│   │   │   └── summarizer.py         # 摘要生成器
-│   │   ├── history/      # 历史记录管理
-│   │   │   └── manager.py            # 历史链管理
-│   │   └── template/     # 提示词模板
-│   │       └── builder.py            # 模板构建器
-│   ├── core/            # 核心模块
-│   │   ├── exceptions.py        # 自定义异常类
-│   │   ├── exception_handlers.py # 全局异常处理器
-│   │   ├── logger.py             # 日志系统配置
-│   │   ├── error_handler.py      # 异常日志工具
-│   │   ├── config_context.py    # 配置上下文与监听器
-│   │   └── README.md             # 核心模块文档
-│   ├── routes/          # API 路由（9 个端点）
-│   │   ├── ai_routes.py      # AI 相关路由（3 个流式端点）
-│   │   ├── config_routes.py   # 配置管理路由（3 个端点）
-│   │   └── knowledge_routes.py # 知识库路由（3 个端点）
-│   ├── schemas/         # 数据模型
-│   │   ├── requests.py      # 请求模型（5 个）
-│   │   ├── responses.py     # 响应模型（7 个）
-│   │   └── stream_models.py # 流式响应模型
-│   ├── services/        # 业务逻辑层
-│   │   ├── ai_service.py   # AI 服务层（业务逻辑编排）
-│   │   ├── cleanup_service.py  # 会话清理服务（单例模式）
-│   │   └── dependencies.py  # FastAPI 依赖注入
-│   ├── utils/           # 工具函数
-│   │   ├── config_manager.py   # 配置文件读写管理
-│   │   └── stream_utils.py     # 流式响应工具
-│   ├── data/            # 数据目录
-│   │   └── ai_sessions/         # AI 会话历史存储
-│   └── logs/            # 日志文件目录
-├── frontend/             # React 前端
-│   ├── package.json     # 前端依赖配置
-│   ├── vite.config.js   # Vite 配置
-│   ├── index.html       # HTML 入口
-│   ├── README.md        # 前端模板说明
+├── backend/               # Python 后端
+│   ├── app/               # 应用层
+│   │   ├── main.py        # FastAPI 应用入口
+│   │   ├── dependencies.py # 依赖注入
+│   │   ├── api/           # API 层
+│   │   │   └── routes/    # 路由
+│   │   │       ├── ai_routes.py
+│   │   │       ├── config_routes.py
+│   │   │       └── knowledge_routes.py
+│   │   └── services/      # 应用服务
+│   │       ├── ai_service.py
+│   │       └── cleanup_service.py
+│   ├── domain/            # 领域层
+│   │   └── knowledge/     # 知识库领域
+│   │       ├── rag/       # RAG 检索与索引
+│   │       │   ├── rag_service.py
+│   │       │   ├── document_processor.py
+│   │       │   ├── file_watcher.py
+│   │       │   └── config.py
+│   │       ├── repositories/
+│   │       │   └── knowledge_repository.py
+│   │       └── services/
+│   │           └── knowledge_service.py
+│   ├── core/              # 核心模块
+│   ├── llm/               # 大模型能力
+│   ├── prompts/           # 提示词配置
+│   ├── schemas/           # 数据模型
+│   ├── utils/             # 工具函数
+│   ├── .data/             # 运行时数据
+│   ├── logs/              # 日志文件
+│   └── requirements.txt   # Python 依赖清单
+├── frontend/              # React 前端
+│   ├── package.json       # 前端依赖配置
+│   ├── vite.config.js     # Vite 配置
+│   ├── index.html         # HTML 入口
+│   ├── README.md          # 前端模板说明
 │   ├── src/
-│   │   ├── main.jsx      # React 入口
-│   │   ├── App.jsx       # 根组件（布局 123 行）
-│   │   ├── api/          # API 调用（3 个文件）
-│   │   │   ├── ai.js     # AI 相关 API（流式读取）
-│   │   │   ├── config.js # 配置 API
-│   │   │   └── knowledge.js # 知识库 API
-│   │   └── pages/        # 页面组件（2 个）
-│   │       ├── Knowledge.jsx  # 知识库主页面（1153 行）
-│   │       └── Config.jsx    # 配置页面（402 行）
-│   └── public/          # 静态资源
-├── main.js              # Electron 主进程入口（209 行）
-├── package.json         # 项目根配置（Electron + 构建脚本）
-├── start-dev.bat        # 开发环境一键启动（Windows）
-├── build-dist.bat      # 一键打包脚本（智能处理 gitignore）
-├── setup-python.bat    # Python 运行时配置助手
-└── README.md          # 项目主文档（本文件）
+│   │   ├── main.jsx       # React 入口
+│   │   ├── App.jsx        # 根组件
+│   │   ├── api/           # API 调用
+│   │   └── pages/         # 页面组件
+│   └── public/            # 静态资源
+├── main.js                # Electron 主进程入口
+├── package.json           # 项目根配置（Electron + 构建脚本）
+├── start-dev.bat          # 开发环境一键启动（Windows）
+├── build-dist.bat         # 一键打包脚本（智能处理 gitignore）
+├── setup-python.bat       # Python 运行时配置助手
+└── README.md              # 项目主文档（本文件）
 ```
 
 ## 安装与使用
@@ -156,7 +141,7 @@ cd frontend && npm install && cd ..
 
 # 终端 1：后端
 cd backend
-python -m uvicorn main:app --reload
+python -m uvicorn app.main:app --reload
 
 # 终端 2：前端
 cd frontend

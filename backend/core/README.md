@@ -107,9 +107,9 @@ async def optimize_markdown_layout_stream(self, filename: str):
 ### 控制台日志
 
 ```
-2026-02-07 12:00:00 | INFO     | backend.main | 应用初始化完成
-2026-02-07 12:00:05 | WARNING  | backend.routes.file_routes | HTTP异常: 404 - 文件不存在
-2026-02-07 12:00:10 | ERROR    | backend.services.ai_service | 排版优化失败: AI服务不可用
+2026-02-07 12:00:00 | INFO     | backend.app.main | 应用初始化完成
+2026-02-07 12:00:05 | WARNING  | backend.app.api.routes.file_routes | HTTP异常: 404 - 文件不存在
+2026-02-07 12:00:10 | ERROR    | backend.app.services.ai_service | 排版优化失败: AI服务不可用
 ```
 
 ### 文件日志
