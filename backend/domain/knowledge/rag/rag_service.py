@@ -268,6 +268,26 @@ class RAGService(IRAGService):
             self._remove_index_marker()
             return False
 
+        # 验证向量库中实际数据量
+        try:
+            collection = self.vectorstore._collection
+            actual_count = collection.count()
+            expected_count = marker.get("chunk_count", 0)
+
+            if actual_count == 0 and expected_count > 0:
+                logger.info("[RAG] 向量库数据丢失，重新索引")
+                self._remove_index_marker()
+                return False
+
+            if actual_count != expected_count:
+                logger.warning(f"[RAG] 向量库数据量不一致 (期望:{expected_count}, 实际:{actual_count})，重新索引")
+                self._remove_index_marker()
+                return False
+        except Exception as e:
+            logger.warning(f"[RAG] 验证向量库失败: {e}，重新索引")
+            self._remove_index_marker()
+            return False
+
         logger.info("[RAG] 已存在索引标记，跳过全量索引")
         return True
 

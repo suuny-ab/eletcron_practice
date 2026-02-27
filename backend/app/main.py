@@ -177,6 +177,8 @@ def _register_config_listeners(app: FastAPI):
 
             # 启动文件监听器
             app.state.rag_service.start_watcher()
+            # 启动全量索引（后台线程，不阻塞）
+            app.state.rag_service.start_indexing()
             logger.info(f"RAG服务已初始化: {vault_path}")
 
         def rollback():

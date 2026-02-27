@@ -76,7 +76,7 @@ class DocumentProcessor:
 
         frontmatter_lines = lines[1:end_index]
         rest_content = "\n".join(lines[end_index + 1:]).lstrip("\n")
-        metadata: JsonDict = {"frontmatter": {}}
+        metadata: JsonDict = {}
 
         current_key = None
         for raw_line in frontmatter_lines:
@@ -87,13 +87,13 @@ class DocumentProcessor:
             stripped_line = line.lstrip()
             if stripped_line.startswith("-") and current_key:
                 value = stripped_line.lstrip("- ").strip()
-                existing = metadata["frontmatter"].get(current_key)
+                existing = metadata.get(current_key)
                 if existing is None:
-                    metadata["frontmatter"][current_key] = [value]
+                    metadata[current_key] = [value]
                 elif isinstance(existing, list):
                     existing.append(value)
                 else:
-                    metadata["frontmatter"][current_key] = [existing, value]
+                    metadata[current_key] = [existing, value]
                 continue
 
             if ":" in line:
@@ -104,18 +104,22 @@ class DocumentProcessor:
 
                 if value.startswith("[") and value.endswith("]"):
                     items = [item.strip() for item in value[1:-1].split(",") if item.strip()]
-                    metadata["frontmatter"][key] = items
+                    if items:  # 只有非空列表才添加
+                        metadata[key] = items
                 elif value:
-                    metadata["frontmatter"][key] = value
-                else:
-                    metadata["frontmatter"].setdefault(key, [])
+                    metadata[key] = value
+                # 空值不添加到 metadata
                 continue
 
-        tags = metadata["frontmatter"].get("tags") or metadata["frontmatter"].get("tag")
+        # 提取 tags 到顶层（如果存在）
+        tags = metadata.get("tags") or metadata.get("tag")
         if isinstance(tags, list):
             metadata["tags"] = tags
         elif isinstance(tags, str):
             metadata["tags"] = [t.strip() for t in tags.split(",") if t.strip()]
+
+        # 过滤掉空列表和 None 值（ChromaDB 不接受）
+        metadata = {k: v for k, v in metadata.items() if v is not None and v != []}
 
         return rest_content, metadata
 
