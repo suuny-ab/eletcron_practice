@@ -19,9 +19,14 @@ class IConfigContext(Protocol):
     
     def register_listener(
         self, 
-        listener: Callable[[Any], Callable[[], None]]
-    ) -> None:
-        """注册配置变更监听器"""
+        listener: Callable[[Any], Callable[[], None]],
+        name: str | None = None
+    ) -> str:
+        """注册配置变更监听器，返回监听器名称"""
+        ...
+    
+    def unregister_listener(self, name: str) -> bool:
+        """取消注册监听器"""
         ...
 
 

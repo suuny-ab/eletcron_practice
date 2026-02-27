@@ -145,7 +145,7 @@ def _register_config_listeners(app: FastAPI):
 
         return lambda: None  # 简单的回滚函数
 
-    app.state.config_context.register_listener(configure_models)
+    app.state.config_context.register_listener(configure_models, name="configure_models")
     
     # 监听器 2：更新提示词配置
     def update_prompts(config):
@@ -161,7 +161,7 @@ def _register_config_listeners(app: FastAPI):
         
         return rollback
     
-    app.state.config_context.register_listener(update_prompts)
+    app.state.config_context.register_listener(update_prompts, name="update_prompts")
     
     # 监听器 3：更新 AI 服务
     def update_ai_service(_config):
@@ -170,7 +170,7 @@ def _register_config_listeners(app: FastAPI):
         app.state.ai_service = container.resolve(AIService)
         return lambda: None
     
-    app.state.config_context.register_listener(update_ai_service)
+    app.state.config_context.register_listener(update_ai_service, name="update_ai_service")
     
     # 监听器 4：更新清理服务的笔记根目录
     def update_cleanup_notes_root(config):
@@ -184,7 +184,7 @@ def _register_config_listeners(app: FastAPI):
         
         return rollback
     
-    app.state.config_context.register_listener(update_cleanup_notes_root)
+    app.state.config_context.register_listener(update_cleanup_notes_root, name="update_cleanup_notes_root")
     
     # 监听器 5：初始化 RAG 服务
     def init_rag_service(config):
@@ -217,7 +217,7 @@ def _register_config_listeners(app: FastAPI):
 
         return rollback
 
-    app.state.config_context.register_listener(init_rag_service)
+    app.state.config_context.register_listener(init_rag_service, name="init_rag_service")
 
 
 # 注册路由

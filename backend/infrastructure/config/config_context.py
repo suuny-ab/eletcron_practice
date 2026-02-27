@@ -15,7 +15,7 @@ class ConfigContext:
 
     def __init__(self):
         self._config: object | None = None
-        self._listeners: list[Callable[[object], None]] = []
+        self._listeners: dict[str, Callable[[object], None]] = {}  # 改用字典，支持按名称管理
         self._updating = False
 
     @property
@@ -48,15 +48,14 @@ class ConfigContext:
         old_config = self._config
 
         try:
-            for idx, listener in enumerate(self._listeners):
-                listener_name = self._get_listener_name(listener)
-                logger.info(f"执行监听器 {idx + 1}/{len(self._listeners)}: {listener_name}")
+            for idx, (name, listener) in enumerate(self._listeners.items()):
+                logger.info(f"执行监听器 {idx + 1}/{len(self._listeners)}: {name}")
 
                 rollback = listener(new_config)
                 if callable(rollback):
-                    rollback_actions.append((listener_name, rollback))
+                    rollback_actions.append((name, rollback))
 
-                logger.info(f"监听器 {listener_name} 执行成功")
+                logger.info(f"监听器 {name} 执行成功")
 
             self._config = new_config
             logger.info("配置更新完成")
@@ -78,23 +77,51 @@ class ConfigContext:
         finally:
             self._updating = False
 
-    def register_listener(self, listener: Callable[[object], None]) -> None:
+    def register_listener(
+        self,
+        listener: Callable[[object], None],
+        name: str | None = None
+    ) -> str:
         """
         注册配置变更监听器
 
         Args:
             listener: 监听器函数，接收配置对象参数
+            name: 监听器名称（可选，用于取消注册）
+
+        Returns:
+            str: 监听器名称
 
         Raises:
             ConfigError: 监听器已注册时抛出
         """
-        if listener in self._listeners:
-            listener_name = self._get_listener_name(listener)
-            logger.warning(f"监听器 {listener_name} 已存在，跳过注册")
-            return
+        listener_name = name or self._get_listener_name(listener)
 
-        self._listeners.append(listener)
-        logger.info(f"已注册监听器: {self._get_listener_name(listener)}")
+        if listener_name in self._listeners:
+            logger.warning(f"监听器 {listener_name} 已存在，将覆盖")
+        else:
+            logger.info(f"已注册监听器: {listener_name}")
+
+        self._listeners[listener_name] = listener
+        return listener_name
+
+    def unregister_listener(self, name: str) -> bool:
+        """
+        取消注册监听器
+
+        Args:
+            name: 监听器名称
+
+        Returns:
+            bool: 是否成功取消注册
+        """
+        if name in self._listeners:
+            del self._listeners[name]
+            logger.info(f"已取消注册监听器: {name}")
+            return True
+
+        logger.warning(f"监听器 {name} 不存在")
+        return False
 
     def _get_listener_name(self, listener: Callable[[object], None]) -> str:
         """获取监听器名称（用于日志）"""
