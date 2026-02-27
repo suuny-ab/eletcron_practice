@@ -25,6 +25,7 @@ from infrastructure.storage.file_watcher import FileWatcher
 from domain.ai.models.model_provider import ModelProvider
 from domain.ai.services.llm_task_service import LLMTaskService
 from infrastructure.logging.logger import get_logger
+from core.interfaces import IRAGService, IModelProvider, ILLMTaskService
 
 logger = get_logger(__name__)
 
@@ -32,17 +33,14 @@ TOKEN_PATTERN = re.compile(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+")
 CJK_PATTERN = re.compile(r"[\u4e00-\u9fff]+")
 
 
-class RAGService:
+class RAGService(IRAGService):
     """RAG服务核心"""
 
     def __init__(
         self,
-        model_provider: ModelProvider,
+        model_provider: IModelProvider,
         notes_root: str,
-        llm_task_service: LLMTaskService,
-        api_key: str = "",
-        model_name: str = "text-embedding-v3",
-        llm_model: str = "qwen-max"
+        llm_task_service: ILLMTaskService,
     ):
         """
         初始化RAG服务
@@ -51,9 +49,6 @@ class RAGService:
             model_provider: 模型提供者实例
             notes_root: 笔记根目录路径
             llm_task_service: 统一LLM任务服务实例
-            api_key: API密钥（DashScope）- 已废弃，保留参数用于兼容
-            model_name: Embedding模型名称 - 已废弃
-            llm_model: 大语言模型名称 - 已废弃
         """
         self._model_provider = model_provider
         self._llm_task_service = llm_task_service
@@ -207,7 +202,7 @@ class RAGService:
                 break
         return filtered
 
-    def start_indexing(self):
+    def start_indexing(self) -> None:
         """后台启动全量索引，避免阻塞启动"""
         if not self.notes_root.exists():
             logger.warning("[RAG] 笔记根目录不存在，跳过索引")
@@ -408,13 +403,13 @@ class RAGService:
             "marker": marker
         }
 
-    def start_watcher(self):
+    def start_watcher(self) -> None:
         """启动文件监听器"""
         if not self._is_watcher_started and self.notes_root.exists():
             self.file_watcher.start(str(self.notes_root))
             self._is_watcher_started = True
 
-    def stop_watcher(self):
+    def stop_watcher(self) -> None:
         """停止文件监听器"""
         if self._is_watcher_started:
             self.file_watcher.stop()

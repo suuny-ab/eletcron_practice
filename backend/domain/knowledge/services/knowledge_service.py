@@ -3,15 +3,16 @@
 """
 from ..repositories.knowledge_repository import KnowledgeRepository
 from schemas.responses import FileTreeData, FileReadResult, FileWriteResult
+from core.interfaces import IKnowledgeService, IKnowledgeRepository
 
 
 
 
 
-class KnowledgeService:
+class KnowledgeService(IKnowledgeService):
     """知识库服务"""
 
-    def __init__(self, repository: KnowledgeRepository):
+    def __init__(self, repository: IKnowledgeRepository):
         self._repository = repository
 
     def get_file_tree(self) -> FileTreeData:

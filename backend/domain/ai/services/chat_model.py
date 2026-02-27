@@ -6,12 +6,13 @@ from langchain_core.messages import BaseMessage
 from langchain_core.output_parsers import StrOutputParser
 
 from ..models.model_provider import ModelProvider
+from core.interfaces import IChatModelService, IModelProvider
 
 
-class ChatModelService:
+class ChatModelService(IChatModelService):
     """聊天模型服务 - 封装模型调用逻辑"""
 
-    def __init__(self, model_provider: ModelProvider):
+    def __init__(self, model_provider: IModelProvider):
         """
         初始化聊天模型服务
 

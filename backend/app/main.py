@@ -12,15 +12,12 @@ from .api.routes import ai_router, config_router, knowledge_router
 # 导入全局异常处理器
 from core import register_exception_handlers
 from infrastructure.logging.logger import get_logger
-from infrastructure.config.config_context import ConfigContext
 
 # 导入配置管理器
 from infrastructure.config.config_manager import config_manager
 
-# 导入模型提供者
+# 导入模型提供者（具体实现）
 from domain.ai.models.model_provider import ModelProvider
-from domain.ai.services.llm_task_service import LLMTaskService
-
 
 # 导入 AI 服务
 from .services.ai_service import AIService
@@ -33,6 +30,7 @@ from .services.cleanup_service import SessionCleanupService
 # 导入容器配置
 from .container_config import configure_container
 from core.container import get_container
+from core.interfaces import IConfigContext, IModelProvider, ILLMTaskService
 
 
 logger = get_logger(__name__)
@@ -47,12 +45,12 @@ async def lifespan(app: FastAPI):
     # 初始化 DI 容器
     configure_container()
     container = get_container()
-    
+
     # 获取清理服务
     app.state.cleanup_service = container.resolve(SessionCleanupService)
-    
+
     # 获取配置上下文
-    app.state.config_context = container.resolve(ConfigContext)
+    app.state.config_context = container.resolve(IConfigContext)
     
     # 注册配置变更监听器
     _register_config_listeners(app)
@@ -103,13 +101,13 @@ def _register_config_listeners(app: FastAPI):
             api_key=config.api_key,
             model_name=config.model_name or "qwen-max"
         )
-        container.register_instance(ModelProvider, model_provider)
-        
+        container.register_instance(IModelProvider, model_provider)
+
         # 清除依赖 ModelProvider 的服务缓存
         # 下次解析时会自动创建新实例
-        
+
         return lambda: None  # 简单的回滚函数
-    
+
     app.state.config_context.register_listener(configure_models)
     
     # 监听器 2：更新提示词配置
@@ -156,33 +154,30 @@ def _register_config_listeners(app: FastAPI):
         """初始化 RAG 服务"""
         from domain.knowledge.rag.rag_service import RAGService
         from infrastructure.storage.file_watcher import FileWatcher
-        
+
         previous_rag_service = getattr(app.state, "rag_service", None)
-        
+
         if config.obsidian_vault_path:
             vault_path = Path(config.obsidian_vault_path)
             file_watcher = FileWatcher(vault_path)
-            
+
             app.state.rag_service = RAGService(
-                model_provider=container.resolve(ModelProvider),
+                model_provider=container.resolve(IModelProvider),
                 notes_root=str(vault_path),
-                llm_task_service=container.resolve(LLMTaskService),
-                api_key=config.api_key,
-                model_name="text-embedding-v3",
-                llm_model=config.model_name or "qwen-max"
+                llm_task_service=container.resolve(ILLMTaskService),
             )
-            
+
             # 启动文件监听器
             app.state.rag_service.start_watcher()
             logger.info(f"RAG服务已初始化: {vault_path}")
-        
+
         def rollback():
             if app.state.rag_service:
                 app.state.rag_service.stop_watcher()
             app.state.rag_service = previous_rag_service
-        
+
         return rollback
-    
+
     app.state.config_context.register_listener(init_rag_service)
 
 

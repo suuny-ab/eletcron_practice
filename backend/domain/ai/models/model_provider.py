@@ -6,8 +6,10 @@ from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain_community.embeddings import DashScopeEmbeddings
 from pydantic import SecretStr
 
+from core.interfaces import IModelProvider
 
-class ModelProvider:
+
+class ModelProvider(IModelProvider):
     """模型实例提供者"""
 
     def __init__(self, api_key: str, model_name: str = "qwen-max"):

@@ -3,47 +3,53 @@
 使用 DI 容器管理服务实例
 """
 from fastapi import Request
+from typing import TYPE_CHECKING
 
 from core.container import get_container
-from domain.ai.models.model_provider import ModelProvider
-from domain.ai.services.chat_model import ChatModelService
-from domain.ai.services.llm_task_service import LLMTaskService
-from domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
+from core.interfaces import (
+    IConfigContext,
+    IModelProvider,
+    IChatModelService,
+    ILLMTaskService,
+    IKnowledgeRepository,
+    IKnowledgeService,
+)
 from .services import AIService, SessionCleanupService
-from domain.knowledge.services.knowledge_service import KnowledgeService
-from infrastructure.config.config_context import ConfigContext
+
+if TYPE_CHECKING:
+    from domain.knowledge.rag.rag_service import RAGService
 
 
 # 从容器解析服务的依赖函数
 
-def get_config_context() -> ConfigContext:
+def get_config_context() -> IConfigContext:
     """获取配置上下文"""
-    return get_container().resolve(ConfigContext)
+    return get_container().resolve(IConfigContext)
 
 
-def get_model_provider() -> ModelProvider:
+def get_model_provider() -> IModelProvider:
     """获取模型提供者"""
-    return get_container().resolve(ModelProvider)
+    return get_container().resolve(IModelProvider)
 
 
-def get_chat_model_service() -> ChatModelService:
+def get_chat_model_service() -> IChatModelService:
     """获取聊天模型服务"""
-    return get_container().resolve(ChatModelService)
+    return get_container().resolve(IChatModelService)
 
 
-def get_llm_task_service() -> LLMTaskService:
+def get_llm_task_service() -> ILLMTaskService:
     """获取 LLM 任务服务"""
-    return get_container().resolve(LLMTaskService)
+    return get_container().resolve(ILLMTaskService)
 
 
-def get_knowledge_repository() -> KnowledgeRepository:
+def get_knowledge_repository() -> IKnowledgeRepository:
     """获取知识库仓储"""
-    return get_container().resolve(KnowledgeRepository)
+    return get_container().resolve(IKnowledgeRepository)
 
 
-def get_knowledge_service() -> KnowledgeService:
+def get_knowledge_service() -> IKnowledgeService:
     """获取知识库服务"""
-    return get_container().resolve(KnowledgeService)
+    return get_container().resolve(IKnowledgeService)
 
 
 def get_ai_service() -> AIService:

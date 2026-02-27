@@ -3,15 +3,14 @@ AI服务层 - 编排排版优化、AI建议等业务逻辑
 """
 from pathlib import Path
 
-from domain.ai.services.llm_task_service import LLMTaskService
-from domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
+from core.interfaces import ILLMTaskService, IKnowledgeRepository
 
 
 
 class AIService:
     """AI服务类，处理排版优化和AI对话的业务逻辑"""
 
-    def __init__(self, llm_task_service: LLMTaskService, knowledge_repository: KnowledgeRepository):
+    def __init__(self, llm_task_service: ILLMTaskService, knowledge_repository: IKnowledgeRepository):
         """
         初始化 AI 服务
 

@@ -7,13 +7,13 @@ from pathlib import Path
 
 from infrastructure.config.config_context import ConfigContext
 from core.exceptions import NotFoundException, ValidationException, ConfigError
-
+from core.interfaces import IKnowledgeRepository, IConfigContext
 from schemas.responses import FileReadResult, FileWriteResult, FileTreeNode
 
 
 
 
-class KnowledgeRepository:
+class KnowledgeRepository(IKnowledgeRepository):
     """知识库仓储层"""
     
     # 文件树缓存
@@ -21,7 +21,7 @@ class KnowledgeRepository:
     _cache_timestamp: float = 0
     _cache_ttl: int = 60  # 缓存有效期60秒
 
-    def __init__(self, config_context: ConfigContext):
+    def __init__(self, config_context: IConfigContext):
         self._config_context = config_context
 
     def get_vault_path(self) -> Path:
