@@ -2,8 +2,7 @@
 知识库服务层 - 对外提供知识库业务能力
 """
 from ..repositories.knowledge_repository import KnowledgeRepository
-from ....schemas.responses import FileTreeData, FileReadResult, FileWriteResult
-
+from schemas.responses import FileTreeData, FileReadResult, FileWriteResult
 
 
 
@@ -16,8 +15,8 @@ class KnowledgeService:
         self._repository = repository
 
     def get_file_tree(self) -> FileTreeData:
-        vault_path = self._repository.get_vault_path()
-        tree = self._repository.build_file_tree(vault_path)
+        """获取文件树（使用缓存）"""
+        tree = self._repository.get_file_tree()
         return FileTreeData(tree=tree)
 
     def read_file(self, relative_path: str) -> FileReadResult:

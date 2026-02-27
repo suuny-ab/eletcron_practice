@@ -3,8 +3,8 @@ AI服务层 - 编排排版优化、AI建议等业务逻辑
 """
 from pathlib import Path
 
-from ...domain.ai.services.llm_task_service import LLMTaskService
-from ...domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
+from domain.ai.services.llm_task_service import LLMTaskService
+from domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
 
 
 

@@ -3,9 +3,9 @@
 处理知识库文件树扫描、文件读取等操作
 """
 from fastapi import APIRouter, Depends
-from ...dependencies import get_knowledge_service
-from ....schemas.responses import DataResponse, FileTreeData, FileReadResult, FileWriteResult
-from ....schemas.requests import FileUpdateRequest
+from app.dependencies import get_knowledge_service
+from schemas.responses import DataResponse, FileTreeData, FileReadResult, FileWriteResult
+from schemas.requests import FileUpdateRequest
 
 # 创建路由器
 router = APIRouter(prefix="/knowledge", tags=["知识库"])

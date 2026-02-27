@@ -10,7 +10,7 @@ from langchain_core.messages import BaseMessage
 from .chat_model import ChatModelService
 from ..history import HistoryManager
 from ..template import TemplateBuilder
-from ....prompts.prompt_config import PromptConfigFactory
+from prompts.prompt_config import PromptConfigFactory
 
 
 

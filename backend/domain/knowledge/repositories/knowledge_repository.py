@@ -2,24 +2,29 @@
 知识库仓储层
 负责对 Obsidian Vault 的文件系统访问
 """
+import time
 from pathlib import Path
 
-from ....infrastructure.config.config_context import ConfigContext
-from ....core.exceptions import NotFoundException, ValidationException, ConfigError
+from infrastructure.config.config_context import ConfigContext
+from core.exceptions import NotFoundException, ValidationException, ConfigError
 
-from ....schemas.responses import FileReadResult, FileWriteResult, FileTreeNode
+from schemas.responses import FileReadResult, FileWriteResult, FileTreeNode
 
 
 
 
 class KnowledgeRepository:
     """知识库仓储层"""
+    
+    # 文件树缓存
+    _file_tree_cache: list[FileTreeNode] | None = None
+    _cache_timestamp: float = 0
+    _cache_ttl: int = 60  # 缓存有效期60秒
 
     def __init__(self, config_context: ConfigContext):
         self._config_context = config_context
 
     def get_vault_path(self) -> Path:
-
         """获取知识库路径"""
         try:
             config = self._config_context.config
@@ -79,6 +84,33 @@ class KnowledgeRepository:
 
         return nodes
 
+    def get_file_tree(self) -> list[FileTreeNode]:
+        """
+        获取文件树（带缓存）
+        
+        Returns:
+            list[FileTreeNode]: 文件树节点列表
+        """
+        # 检查缓存是否有效
+        if (self._file_tree_cache is not None and 
+            time.time() - self._cache_timestamp < self._cache_ttl):
+            return self._file_tree_cache
+        
+        # 缓存失效，重新构建
+        vault_path = self.get_vault_path()
+        tree = self.build_file_tree(vault_path)
+        
+        # 更新缓存
+        self._file_tree_cache = tree
+        self._cache_timestamp = time.time()
+        
+        return tree
+    
+    def invalidate_file_tree_cache(self) -> None:
+        """清除文件树缓存"""
+        self._file_tree_cache = None
+        self._cache_timestamp = 0
+
     def get_full_path(self, relative_path: str) -> Path:
         """获取文件的完整路径"""
         vault_path = self.get_vault_path()
@@ -127,6 +159,9 @@ class KnowledgeRepository:
 
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(content)
+        
+        # 文件变更，清除缓存
+        self.invalidate_file_tree_cache()
 
         return FileWriteResult(
             success=True,

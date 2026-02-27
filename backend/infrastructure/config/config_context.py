@@ -5,7 +5,7 @@
 from typing import Callable
 
 from ..logging.logger import get_logger
-from ...core.exceptions import ConfigError
+from core.exceptions import ConfigError
 
 logger = get_logger(__name__)
 

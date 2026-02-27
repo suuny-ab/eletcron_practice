@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from pydantic import BaseModel, ValidationError, Field
 
-from ...core.exceptions import ConfigError
+from core.exceptions import ConfigError
 
 
 class ConfigModel(BaseModel):

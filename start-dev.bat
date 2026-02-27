@@ -89,7 +89,7 @@ if %errorlevel% equ 0 (
 )
 timeout /t 2 /nobreak >nul
 
-start "Backend" cmd /k "cd /d %~dp0 && python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000 --reload"
+start "Backend" cmd /k "cd /d %~dp0\backend && python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload"
 timeout /t 3 /nobreak >nul
 start "Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
 timeout /t 3 /nobreak >nul
