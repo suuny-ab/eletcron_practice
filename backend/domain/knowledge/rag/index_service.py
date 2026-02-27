@@ -267,8 +267,12 @@ class IndexService:
 
             # 清理向量库中的旧数据，避免数据累积
             try:
-                self._vectorstore._collection.delete()
-                logger.info("[RAG] 已清理向量库旧数据")
+                existing = self._vectorstore._collection.get()
+                if existing and existing.get("ids"):
+                    self._vectorstore._collection.delete(ids=existing["ids"])
+                    logger.info(f"[RAG] 已清理向量库旧数据 ({len(existing['ids'])} 条)")
+                else:
+                    logger.info("[RAG] 向量库为空，无需清理")
             except Exception as e:
                 logger.warning(f"[RAG] 清理向量库失败: {e}，继续索引")
 
