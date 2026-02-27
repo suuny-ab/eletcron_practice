@@ -16,7 +16,7 @@ const apiClient = axios.create({
  * 读取配置
  */
 export const getConfig = async () => {
-  const response = await apiClient.get('/config');
+  const response = await apiClient.get('/api/config');
   return response.data;
 };
 
@@ -24,7 +24,7 @@ export const getConfig = async () => {
  * 更新配置
  */
 export const updateConfig = async (configData) => {
-  const response = await apiClient.put('/config', configData);
+  const response = await apiClient.put('/api/config', configData);
   return response.data;
 };
 
@@ -32,6 +32,6 @@ export const updateConfig = async (configData) => {
  * 删除配置
  */
 export const deleteConfig = async () => {
-  const response = await apiClient.delete('/config');
+  const response = await apiClient.delete('/api/config');
   return response.data;
 };

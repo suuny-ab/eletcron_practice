@@ -22,7 +22,7 @@ const apiClient = axios.create({
  * @returns {AsyncGenerator} 流式响应生成器
  */
 export async function aiAdvise(filename, question, signal) {
-  const response = await fetch(`${API_BASE_URL}/ai/advise`, {
+  const response = await fetch(`${API_BASE_URL}/api/ai/advise`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -46,7 +46,7 @@ export async function aiAdvise(filename, question, signal) {
  * @returns {AsyncGenerator} 流式响应生成器
  */
 export async function aiEdit(filename, requirement, signal) {
-  const response = await fetch(`${API_BASE_URL}/ai/edit`, {
+  const response = await fetch(`${API_BASE_URL}/api/ai/edit`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -69,7 +69,7 @@ export async function aiEdit(filename, requirement, signal) {
  * @returns {AsyncGenerator} 流式响应生成器
  */
 export async function aiOptimize(filename, signal) {
-  const response = await fetch(`${API_BASE_URL}/ai/optimize`, {
+  const response = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -156,7 +156,7 @@ export async function* readEventStream(stream, signal) {
  * @returns {ReadableStream} 流式响应
  */
 export async function ragAskStream(question, topK = 3, signal) {
-  const response = await fetch(`${API_BASE_URL}/ai/rag`, {
+  const response = await fetch(`${API_BASE_URL}/api/ai/rag`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

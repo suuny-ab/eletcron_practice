@@ -16,7 +16,7 @@ const apiClient = axios.create({
  * 获取知识库文件树
  */
 export const getFileTree = async () => {
-  const response = await apiClient.get('/knowledge/tree');
+  const response = await apiClient.get('/api/knowledge/tree');
   return response.data;
 };
 
@@ -25,7 +25,7 @@ export const getFileTree = async () => {
  * @param {string} relativePath - 相对路径
  */
 export const getFileContent = async (relativePath) => {
-  const response = await apiClient.get(`/knowledge/file/${relativePath}`);
+  const response = await apiClient.get(`/api/knowledge/file/${relativePath}`);
   return response.data;
 };
 
@@ -35,6 +35,6 @@ export const getFileContent = async (relativePath) => {
  * @param {string} content - 新内容
  */
 export const updateFileContent = async (relativePath, content) => {
-  const response = await apiClient.put(`/knowledge/file/${relativePath}`, { content });
+  const response = await apiClient.put(`/api/knowledge/file/${relativePath}`, { content });
   return response.data;
 };
