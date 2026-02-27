@@ -1,6 +1,8 @@
 """
 FastAPI 主应用 - 应用初始化和路由注册
 """
+import signal
+import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from pathlib import Path
@@ -85,6 +87,13 @@ async def lifespan(app: FastAPI):
     
     # 关闭时执行
     logger.info("应用关闭中...")
+    
+    # 停止 RAG 服务
+    if hasattr(app.state, "rag_service") and app.state.rag_service:
+        logger.info("正在停止 RAG 服务...")
+        app.state.rag_service.stop_watcher()
+        app.state.rag_service.stop_indexing()
+        logger.info("RAG 服务已停止")
 
 
 # 创建 FastAPI 应用并使用 lifespan
@@ -92,6 +101,26 @@ app = FastAPI(lifespan=lifespan)
 
 # 注册全局异常处理器
 register_exception_handlers(app)
+
+
+# 注册信号处理器，确保优雅关闭
+def _signal_handler(signum, frame):
+    """处理终止信号，确保清理逻辑被执行"""
+    logger.info(f"收到信号 {signum}，正在关闭...")
+    
+    # 停止 RAG 服务
+    if hasattr(app.state, "rag_service") and app.state.rag_service:
+        logger.info("正在停止 RAG 服务...")
+        app.state.rag_service.stop_watcher()
+        app.state.rag_service.stop_indexing()
+        logger.info("RAG 服务已停止")
+    
+    sys.exit(0)
+
+
+# 注册 SIGINT (Ctrl+C) 和 SIGTERM 信号处理器
+signal.signal(signal.SIGINT, _signal_handler)
+signal.signal(signal.SIGTERM, _signal_handler)
 
 
 def _register_config_listeners(app: FastAPI):

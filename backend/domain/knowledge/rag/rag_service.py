@@ -3,7 +3,7 @@ RAG服务核心
 整合索引、检索功能
 """
 from pathlib import Path
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 import json
 import time
 import math
@@ -78,6 +78,7 @@ class RAGService(IRAGService):
         self._indexing_lock = Lock()
         self._is_indexing = False
         self._indexing_thread: Thread | None = None
+        self._stop_event = Event()  # 停止信号
 
     def _tokenize(self, text: str) -> list[str]:
         """将文本拆分为BM25可用的tokens（中英文混合）。"""
@@ -105,6 +106,49 @@ class RAGService(IRAGService):
                 logger.warning(f"[RAG] 读取文件失败 {md_file}: {e}")
                 continue
         return documents
+
+    def _add_texts_in_batches(
+        self,
+        texts: list[str],
+        metadatas: list[dict],
+        batch_size: int = 20
+    ) -> int:
+        """
+        分批添加文档到向量库，支持停止信号中断
+
+        Args:
+            texts: 文本列表
+            metadatas: 元数据列表
+            batch_size: 每批处理的文档数
+
+        Returns:
+            已成功添加的文档数
+        """
+        total = len(texts)
+        added = 0
+
+        for i in range(0, total, batch_size):
+            if self._stop_event.is_set():
+                logger.info(f"[RAG] 收到停止信号，已添加 {added}/{total} 个文档")
+                return added
+
+            batch_texts = texts[i:i + batch_size]
+            batch_metadatas = metadatas[i:i + batch_size]
+
+            try:
+                self.vectorstore.add_texts(texts=batch_texts, metadatas=batch_metadatas)
+                added += len(batch_texts)
+            except Exception as e:
+                logger.warning(f"[RAG] 批量添加文档失败 [{i}:{i + batch_size}]: {e}")
+                # 单个文档重试
+                for j, (text, meta) in enumerate(zip(batch_texts, batch_metadatas)):
+                    try:
+                        self.vectorstore.add_texts(texts=[text], metadatas=[meta])
+                        added += 1
+                    except Exception as e2:
+                        logger.warning(f"[RAG] 单个文档添加失败: {e2}")
+
+        return added
 
     def _build_bm25_index(self, documents: list[dict]):
         """基于文档块构建BM25索引。"""
@@ -213,12 +257,39 @@ class RAGService(IRAGService):
                 logger.info("[RAG] 全量索引已在运行，跳过重复启动")
                 return
 
+            self._stop_event.clear()  # 重置停止信号
             self._indexing_thread = Thread(
                 target=self._full_index,
                 name="rag-full-index",
                 daemon=True
             )
             self._indexing_thread.start()
+
+    def stop_indexing(self, timeout: float = 30.0) -> bool:
+        """
+        停止索引线程并等待完成
+
+        Args:
+            timeout: 等待超时时间（秒）
+
+        Returns:
+            True 表示线程已停止，False 表示超时
+        """
+        if not self._indexing_thread or not self._indexing_thread.is_alive():
+            return True
+
+        logger.info("[RAG] 正在停止索引线程...")
+        self._stop_event.set()
+
+        self._indexing_thread.join(timeout=timeout)
+        stopped = not self._indexing_thread.is_alive()
+
+        if stopped:
+            logger.info("[RAG] 索引线程已停止")
+        else:
+            logger.warning("[RAG] 索引线程停止超时")
+
+        return stopped
 
     def _load_index_marker(self) -> dict | None:
         """读取索引标记文件"""
@@ -300,6 +371,11 @@ class RAGService(IRAGService):
 
         start_time = None
         try:
+            # 检查停止信号
+            if self._stop_event.is_set():
+                logger.info("[RAG] 收到停止信号，跳过索引")
+                return
+
             if self._should_skip_full_index():
                 self._rebuild_bm25_from_files()
                 return
@@ -324,16 +400,34 @@ class RAGService(IRAGService):
 
             logger.info(f"[RAG] 开始全量索引，共 {len(md_files)} 个文件...")
 
+            # 检查停止信号
+            if self._stop_event.is_set():
+                logger.info("[RAG] 收到停止信号，中断索引")
+                return
+
             # 切分并添加文档
             documents = self._collect_documents_from_files(md_files)
+
+            # 检查停止信号
+            if self._stop_event.is_set():
+                logger.info("[RAG] 收到停止信号，中断索引")
+                return
 
             if documents:
                 texts = [doc["content"] for doc in documents]
                 metadatas = [doc["metadata"] for doc in documents]
-                self.vectorstore.add_texts(texts=texts, metadatas=metadatas)
+
+                # 分批添加，支持停止信号中断
+                added_count = self._add_texts_in_batches(texts, metadatas)
+
+                # 检查停止信号
+                if self._stop_event.is_set():
+                    logger.info("[RAG] 收到停止信号，跳过BM25索引和标记写入")
+                    return
+
                 self._build_bm25_index(documents)
-                logger.info(f"[RAG] 全量索引完成，共添加 {len(texts)} 个文档块")
-                self._write_index_marker(file_count=len(md_files), chunk_count=len(texts))
+                logger.info(f"[RAG] 全量索引完成，共添加 {added_count} 个文档块")
+                self._write_index_marker(file_count=len(md_files), chunk_count=added_count)
             else:
                 logger.info("[RAG] 没有文档需要索引")
                 self._build_bm25_index([])
