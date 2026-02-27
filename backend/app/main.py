@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from pathlib import Path
 
 # 导入路由模块
-from .api.routes import ai_router, config_router, knowledge_router
+from .api.routes import ai_router, config_router, knowledge_router, health_router
 
 
 # 导入全局异常处理器
@@ -221,12 +221,7 @@ def _register_config_listeners(app: FastAPI):
 
 
 # 注册路由
+app.include_router(health_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")
 app.include_router(config_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api")
-
-
-@app.get("/health")
-async def health_check():
-    """健康检查端点"""
-    return {"status": "healthy"}

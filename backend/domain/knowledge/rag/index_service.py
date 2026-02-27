@@ -12,7 +12,8 @@ from .bm25_index import BM25Index
 from .config import VECTOR_DB_PATH, INDEX_MARKER_PATH
 from infrastructure.storage.document_processor import DocumentProcessor
 from infrastructure.storage.file_watcher import FileWatcher
-from infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger, LogContext
+from infrastructure.metrics import get_metrics
 
 logger = get_logger(__name__)
 
@@ -227,12 +228,16 @@ class IndexService:
 
     def _full_index(self):
         """全量索引：索引所有Markdown文件"""
+        metrics = get_metrics()
+
         with self._indexing_lock:
             if self._is_indexing:
                 return
             self._is_indexing = True
 
         start_time = None
+        file_count = 0
+        chunk_count = 0
         try:
             if self._stop_event.is_set():
                 logger.info("[RAG] 收到停止信号，跳过索引")
@@ -251,6 +256,7 @@ class IndexService:
             # 查找所有Markdown文件
             md_files = list(self._notes_root.rglob("*.md"))
             md_files.extend(list(self._notes_root.rglob("*.markdown")))
+            file_count = len(md_files)
 
             if not md_files:
                 logger.info("[RAG] 未找到 Markdown 文件")
@@ -258,7 +264,7 @@ class IndexService:
                 self._write_index_marker(file_count=0, chunk_count=0)
                 return
 
-            logger.info(f"[RAG] 开始全量索引，共 {len(md_files)} 个文件...")
+            logger.info(f"[RAG] 开始全量索引，共 {file_count} 个文件...")
 
             if self._stop_event.is_set():
                 logger.info("[RAG] 收到停止信号，中断索引")
@@ -276,6 +282,7 @@ class IndexService:
                 metadatas = [doc["metadata"] for doc in documents]
 
                 added_count = self._add_texts_in_batches(texts, metadatas)
+                chunk_count = added_count
 
                 if self._stop_event.is_set():
                     logger.info("[RAG] 收到停止信号，跳过BM25索引和标记写入")
@@ -293,7 +300,20 @@ class IndexService:
         finally:
             if start_time is not None:
                 elapsed = time.monotonic() - start_time
-                logger.info(f"[RAG] 全量索引耗时 {elapsed:.2f} 秒")
+                # 记录指标
+                metrics.observe("rag.index.duration_seconds", elapsed)
+                metrics.increment("rag.index.files_indexed", file_count)
+                metrics.increment("rag.index.chunks_created", chunk_count)
+
+                # 结构化日志
+                logger.info(
+                    "全量索引完成",
+                    extra={"context": LogContext(
+                        operation="rag.index.full",
+                        duration_ms=elapsed * 1000,
+                        extra={"files": file_count, "chunks": chunk_count}
+                    )}
+                )
             with self._indexing_lock:
                 self._is_indexing = False
 

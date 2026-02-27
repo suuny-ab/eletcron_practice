@@ -3,11 +3,13 @@
 负责向量检索、BM25检索、混合检索和重排序
 """
 import math
+import time
 from langchain_community.vectorstores import Chroma
 from .bm25_index import BM25Index
 from .config import VECTOR_TOP_K, BM25_TOP_K, HYBRID_TOP_K, VECTOR_WEIGHT, BM25_WEIGHT
 from domain.ai.services.llm_task_service import LLMTaskService
-from infrastructure.logging.logger import get_logger
+from infrastructure.logging.logger import get_logger, LogContext
+from infrastructure.metrics import get_metrics
 
 logger = get_logger(__name__)
 
@@ -99,90 +101,98 @@ class RetrievalService:
         Returns:
             来源列表
         """
+        metrics = get_metrics()
+        start_time = time.perf_counter()
+
         if not self._vectorstore:
             raise ValueError("向量数据库未初始化")
 
-        # 向量检索
-        vector_results = self._vectorstore.similarity_search_with_score(
-            query=question,
-            k=VECTOR_TOP_K
-        )
-        # BM25检索
-        bm25_results = self._bm25_index.search(question, BM25_TOP_K)
+        try:
+            # 向量检索
+            vector_results = self._vectorstore.similarity_search_with_score(
+                query=question,
+                k=VECTOR_TOP_K
+            )
+            # BM25检索
+            bm25_results = self._bm25_index.search(question, BM25_TOP_K)
 
-        if not vector_results and not bm25_results:
-            return []
+            if not vector_results and not bm25_results:
+                return []
 
-        # 合并候选
-        candidates: dict[str, dict] = {}
+            # 合并候选
+            candidates: dict[str, dict] = {}
 
-        # 处理向量检索结果
-        vector_sims: list[float] = []
-        vector_docs: list[tuple] = []
-        for doc, score in vector_results:
-            raw_score = float(score)
-            sim_score = 1.0 / (1.0 + raw_score)
-            vector_sims.append(sim_score)
-            vector_docs.append((doc, raw_score))
+            # 处理向量检索结果
+            vector_sims: list[float] = []
+            vector_docs: list[tuple] = []
+            for doc, score in vector_results:
+                raw_score = float(score)
+                sim_score = 1.0 / (1.0 + raw_score)
+                vector_sims.append(sim_score)
+                vector_docs.append((doc, raw_score))
 
-        vector_norms = self._normalize_scores(vector_sims)
-        for idx, (doc, raw_score) in enumerate(vector_docs):
-            metadata = doc.metadata or {}
-            key = metadata.get("chunk_id") or f"{metadata.get('filename', '')}::{doc.page_content}"
-            if key not in candidates:
-                candidates[key] = {
-                    "filename": metadata.get("filename", ""),
-                    "content": doc.page_content,
-                    "metadata": metadata,
-                    "vector_score": 0.0,
-                    "bm25_score": 0.0,
-                }
-            candidates[key]["vector_score"] = vector_norms[idx]
-            candidates[key]["raw_vector_score"] = raw_score
+            vector_norms = self._normalize_scores(vector_sims)
+            for idx, (doc, raw_score) in enumerate(vector_docs):
+                metadata = doc.metadata or {}
+                key = metadata.get("chunk_id") or f"{metadata.get('filename', '')}::{doc.page_content}"
+                if key not in candidates:
+                    candidates[key] = {
+                        "filename": metadata.get("filename", ""),
+                        "content": doc.page_content,
+                        "metadata": metadata,
+                        "vector_score": 0.0,
+                        "bm25_score": 0.0,
+                    }
+                candidates[key]["vector_score"] = vector_norms[idx]
+                candidates[key]["raw_vector_score"] = raw_score
 
-        # 处理BM25检索结果
-        bm25_scores = [score for _, _, score in bm25_results]
-        bm25_norms = self._normalize_scores(bm25_scores)
-        for idx, (content, metadata, score) in enumerate(bm25_results):
-            key = metadata.get("chunk_id") or f"{metadata.get('filename', '')}::{content}"
-            if key not in candidates:
-                candidates[key] = {
-                    "filename": metadata.get("filename", ""),
-                    "content": content,
-                    "metadata": metadata,
-                    "vector_score": 0.0,
-                    "bm25_score": 0.0,
-                }
-            candidates[key]["bm25_score"] = bm25_norms[idx]
-            candidates[key]["raw_bm25_score"] = float(score)
+            # 处理BM25检索结果
+            bm25_scores = [score for _, _, score in bm25_results]
+            bm25_norms = self._normalize_scores(bm25_scores)
+            for idx, (content, metadata, score) in enumerate(bm25_results):
+                key = metadata.get("chunk_id") or f"{metadata.get('filename', '')}::{content}"
+                if key not in candidates:
+                    candidates[key] = {
+                        "filename": metadata.get("filename", ""),
+                        "content": content,
+                        "metadata": metadata,
+                        "vector_score": 0.0,
+                        "bm25_score": 0.0,
+                    }
+                candidates[key]["bm25_score"] = bm25_norms[idx]
+                candidates[key]["raw_bm25_score"] = float(score)
 
-        # 混合评分
-        merged = []
-        for cand in candidates.values():
-            hybrid_score = VECTOR_WEIGHT * cand["vector_score"] + BM25_WEIGHT * cand["bm25_score"]
-            cand["hybrid_score"] = hybrid_score
-            merged.append(cand)
+            # 混合评分
+            merged = []
+            for cand in candidates.values():
+                hybrid_score = VECTOR_WEIGHT * cand["vector_score"] + BM25_WEIGHT * cand["bm25_score"]
+                cand["hybrid_score"] = hybrid_score
+                merged.append(cand)
 
-        merged.sort(key=lambda item: item["hybrid_score"], reverse=True)
-        if HYBRID_TOP_K > 0:
-            merged = merged[:min(HYBRID_TOP_K, len(merged))]
+            merged.sort(key=lambda item: item["hybrid_score"], reverse=True)
+            if HYBRID_TOP_K > 0:
+                merged = merged[:min(HYBRID_TOP_K, len(merged))]
 
-        # LLM重排序
-        rerank_indices = self._llm_rerank(question, merged, min(top_k, len(merged)))
-        if rerank_indices:
-            selected = [merged[i] for i in rerank_indices]
-        else:
-            selected = merged[:top_k]
+            # LLM重排序
+            rerank_indices = self._llm_rerank(question, merged, min(top_k, len(merged)))
+            if rerank_indices:
+                selected = [merged[i] for i in rerank_indices]
+            else:
+                selected = merged[:top_k]
 
-        sources = []
-        for item in selected:
-            sources.append({
-                "filename": item["filename"],
-                "content": item["content"],
-                "score": float(item.get("hybrid_score", 0.0))
-            })
+            sources = []
+            for item in selected:
+                sources.append({
+                    "filename": item["filename"],
+                    "content": item["content"],
+                    "score": float(item.get("hybrid_score", 0.0))
+                })
 
-        return sources
+            return sources
+        finally:
+            elapsed = time.perf_counter() - start_time
+            metrics.observe("rag.retrieval.duration_seconds", elapsed)
+            metrics.increment("rag.retrieval.queries")
 
     def build_context(self, sources: list[dict]) -> str:
         """根据检索来源构建上下文"""
