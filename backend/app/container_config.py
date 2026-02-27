@@ -59,6 +59,10 @@ def create_test_container() -> Container:
     创建测试用容器
     可以注册 Mock 实现，便于单元测试
     """
+    # 重置全局容器以确保测试隔离
+    from core.container import reset_container
+    reset_container()
+    
     container = Container()
 
     # 测试时可以替换为 Mock 实现

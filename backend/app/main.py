@@ -30,7 +30,12 @@ from .services.cleanup_service import SessionCleanupService
 # 导入容器配置
 from .container_config import configure_container
 from core.container import get_container
-from core.interfaces import IConfigContext, IModelProvider, ILLMTaskService
+from core.interfaces import (
+    IConfigContext, 
+    IModelProvider, 
+    IChatModelService,
+    ILLMTaskService
+)
 
 
 logger = get_logger(__name__)
@@ -103,8 +108,11 @@ def _register_config_listeners(app: FastAPI):
         )
         container.register_instance(IModelProvider, model_provider)
 
-        # 清除依赖 ModelProvider 的服务缓存
-        # 下次解析时会自动创建新实例
+        # 级联失效依赖 ModelProvider 的服务
+        # 确保下次解析时创建新实例，使用新的 ModelProvider
+        container.invalidate(IChatModelService)
+        container.invalidate(ILLMTaskService)
+        logger.info("已失效依赖 ModelProvider 的服务缓存")
 
         return lambda: None  # 简单的回滚函数
 

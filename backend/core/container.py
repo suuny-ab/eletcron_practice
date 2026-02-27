@@ -2,10 +2,13 @@
 轻量级依赖注入容器
 提供服务的注册、解析和生命周期管理
 """
-from typing import TypeVar, Type, Callable, Any, Dict, Optional
+from typing import TypeVar, Type, Callable, Any, Dict, Optional, Set
 from enum import Enum, auto
+import threading
+from infrastructure.logging.logger import get_logger
 
 T = TypeVar("T")
+logger = get_logger(__name__)
 
 
 class Lifetime(Enum):
@@ -32,7 +35,7 @@ class ServiceDescriptor:
 
 class Container:
     """
-    依赖注入容器
+    依赖注入容器（线程安全）
     
     示例:
         container = Container()
@@ -50,6 +53,8 @@ class Container:
     def __init__(self):
         self._services: Dict[Type, ServiceDescriptor] = {}
         self._singleton_instances: Dict[Type, Any] = {}
+        self._instance_lock = threading.Lock()  # 保护单例实例创建
+        self._registration_lock = threading.Lock()  # 保护服务注册
     
     def register(
         self,
@@ -58,61 +63,66 @@ class Container:
         lifetime: Lifetime = Lifetime.TRANSIENT
     ) -> "Container":
         """
-        注册服务
-        
+        注册服务（线程安全）
+
         Args:
             interface: 服务接口（可以是抽象类或协议）
             implementation: 实现类或工厂函数
             lifetime: 生命周期
-        
+
         Returns:
             self，支持链式调用
         """
-        self._services[interface] = ServiceDescriptor(
-            interface, implementation, lifetime
-        )
+        with self._registration_lock:
+            self._services[interface] = ServiceDescriptor(
+                interface, implementation, lifetime
+            )
         return self
     
     def register_instance(self, interface: Type[T], instance: T) -> "Container":
         """
-        注册已有实例（用于单例）
-        
+        注册已有实例（用于单例，线程安全）
+
         Args:
             interface: 服务接口
             instance: 实例对象
         """
-        descriptor = ServiceDescriptor(interface, lambda: instance, Lifetime.SINGLETON)
-        descriptor.instance = instance
-        self._services[interface] = descriptor
-        self._singleton_instances[interface] = instance
+        with self._registration_lock:
+            descriptor = ServiceDescriptor(interface, lambda: instance, Lifetime.SINGLETON)
+            descriptor.instance = instance
+            self._services[interface] = descriptor
+            self._singleton_instances[interface] = instance
         return self
     
     def resolve(self, interface: Type[T]) -> T:
         """
-        解析服务
-        
+        解析服务（线程安全）
+
         Args:
             interface: 服务接口
-        
+
         Returns:
             服务实例
-        
+
         Raises:
             KeyError: 服务未注册
         """
         if interface not in self._services:
             raise KeyError(f"服务未注册: {interface.__name__}")
-        
+
         descriptor = self._services[interface]
-        
-        # 单例模式
+
+        # 单例模式（线程安全）
         if descriptor.lifetime == Lifetime.SINGLETON:
+            # 使用双重检查锁定模式
             if descriptor.instance is None:
-                descriptor.instance = self._create_instance(descriptor)
-                self._singleton_instances[interface] = descriptor.instance
+                with self._instance_lock:
+                    if descriptor.instance is None:
+                        descriptor.instance = self._create_instance(descriptor)
+                        self._singleton_instances[interface] = descriptor.instance
             return descriptor.instance
-        
-        # 瞬态模式
+
+        # 瞬态模式（每次创建新实例）
         return self._create_instance(descriptor)
     
     def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
@@ -145,7 +155,47 @@ class Container:
     def is_registered(self, interface: Type) -> bool:
         """检查服务是否已注册"""
         return interface in self._services
-    
+
+    def invalidate(self, interface: Type[T]) -> bool:
+        """
+        使服务的单例缓存失效（线程安全）
+
+        用于配置更新时清除依赖服务的缓存，强制下次解析时重新创建实例。
+
+        Args:
+            interface: 服务接口
+
+        Returns:
+            bool: 是否成功失效（如果服务不存在返回 False）
+        """
+        with self._instance_lock:
+            if interface not in self._services:
+                return False
+
+            descriptor = self._services[interface]
+
+            # 清除单例缓存
+            if descriptor.instance is not None:
+                logger.debug(f"失效单例缓存: {interface.__name__}")
+                descriptor.instance = None
+
+            if interface in self._singleton_instances:
+                del self._singleton_instances[interface]
+
+            return True
+
+    def invalidate_all(self) -> None:
+        """
+        使所有单例缓存失效（线程安全）
+
+        用于应用关闭或完全重置容器时清理所有实例。
+        """
+        with self._instance_lock:
+            logger.debug("失效所有单例缓存")
+            for descriptor in self._services.values():
+                descriptor.instance = None
+            self._singleton_instances.clear()
+
     def create_scope(self) -> "Scope":
         """创建作用域（用于 Scoped 生命周期）"""
         return Scope(self)
@@ -181,19 +231,51 @@ class Scope:
         self._scoped_instances.clear()
 
 
-# 全局容器实例
+# 全局容器实例（线程安全）
 _default_container: Optional[Container] = None
+_container_lock = threading.Lock()
 
 
 def get_container() -> Container:
-    """获取默认容器"""
+    """
+    获取默认容器（线程安全）
+
+    使用双重检查锁定模式确保多线程环境下只创建一个容器实例。
+
+    Returns:
+        Container: 默认容器实例
+    """
     global _default_container
     if _default_container is None:
-        _default_container = Container()
+        with _container_lock:
+            if _default_container is None:
+                logger.debug("创建默认容器实例")
+                _default_container = Container()
     return _default_container
 
 
 def set_container(container: Container) -> None:
-    """设置默认容器"""
+    """
+    设置默认容器（线程安全）
+
+    Args:
+        container: 要设置的容器实例
+    """
     global _default_container
-    _default_container = container
+    with _container_lock:
+        logger.debug("设置新的默认容器实例")
+        _default_container = container
+
+
+def reset_container() -> None:
+    """
+    重置默认容器（线程安全）
+
+    用于测试环境清理，使全局容器失效并创建新容器。
+    """
+    global _default_container
+    with _container_lock:
+        if _default_container is not None:
+            logger.debug("重置默认容器")
+            _default_container.invalidate_all()
+        _default_container = None
