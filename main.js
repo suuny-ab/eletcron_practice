@@ -110,7 +110,8 @@ const startBackend = () => {
     env.PYTHONPATH = pythonPath
   }
 
-  if (fs.existsSync(pythonRoot)) {
+  // 仅在生产环境（打包后）设置 PYTHONHOME，开发环境的虚拟环境不需要
+  if (app.isPackaged && fs.existsSync(pythonRoot)) {
     env.PYTHONHOME = pythonRoot
   }
 

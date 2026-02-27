@@ -33,6 +33,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     activeNote,
     activeNoteState,
     setActiveMainTab,
+    setOpenChunks,
     updateTabForConfig,
     updateNoteState,
     getNoteState,
@@ -181,6 +182,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
 
     // AI建议模式：在对话中显示
     addMessage('user', userInput);
+    addMessage('assistant', '');  // 先添加空的AI消息占位
     setUserInput('');
 
     try {
@@ -189,10 +191,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
       });
     } catch (error) {
       if (error.name !== 'AbortError') {
-        setChatMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `错误：${error.message}`
-        }]);
+        updateLastMessage(`错误：${error.message}`);
       }
     }
   }, [userInput, aiMode, activeNoteKey, fileContent, ragTopK, sendRagQuery, sendEditRequest, sendAdviseMessage, addMessage, updateLastMessage, setUserInput, setPreviewMode, setOriginalContent, setGeneratedContent, setOpenChunks]);
@@ -234,6 +233,25 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     setOriginalContent('');
     setGeneratedContent('');
   }, [aiGenerating, ragLoading, cancelGeneration, cancelQuery, setPreviewMode, setOriginalContent, setGeneratedContent]);
+
+  // 确认保存AI生成的内容（包装函数）
+  const handleConfirmAiResultWrapper = useCallback(async (generatedContent) => {
+    // 保存用户输入用于添加对话记录
+    const userRequirement = userInput;
+    
+    await handleConfirmAiResult(generatedContent);
+    
+    // 保存成功后：添加对话记录、重置预览模式、清空输入框
+    if (aiMode === 'edit' && userRequirement) {
+      addMessage('user', `编辑要求: ${userRequirement}`);
+      addMessage('assistant', generatedContent);
+    }
+    
+    setPreviewMode(false);
+    setOriginalContent('');
+    setGeneratedContent('');
+    setUserInput('');
+  }, [handleConfirmAiResult, setPreviewMode, setOriginalContent, setGeneratedContent, setUserInput, aiMode, addMessage, userInput]);
 
 
 
@@ -347,7 +365,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
           generatedContent={generatedContent}
           aiGenerating={aiGenerating}
           ragLoading={ragLoading}
-          onConfirmPreview={handleConfirmAiResult}
+          onConfirmPreview={handleConfirmAiResultWrapper}
           onCancelPreview={handleCancelAiResult}
           selectedFile={selectedFile}
           onOpenChunk={(source, index) => openRagChunk(source, index, currentQueryId)}

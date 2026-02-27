@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ConfigProvider, Layout, Typography, Button, Space, Tooltip, ButtonGroup } from 'antd';
+import { ConfigProvider, Layout, Typography, Button, Space, Tooltip } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { VerticalLeftOutlined, VerticalRightOutlined, SettingOutlined, BookOutlined, BugOutlined, DashboardOutlined } from '@ant-design/icons';
 import KnowledgePage from './pages/Knowledge';
@@ -62,7 +62,7 @@ function App() {
             <Title level={4} style={{ margin: 0, fontWeight: 600, fontSize: 16 }}>
               <BookOutlined /> {pageTitle[currentPage]}
             </Title>
-            <ButtonGroup size="small" style={{ marginLeft: 12 }}>
+            <Space.Compact size="small" style={{ marginLeft: 12 }}>
               <Button
                 type={currentPage === 'knowledge' ? 'primary' : 'default'}
                 onClick={() => setCurrentPage('knowledge')}
@@ -83,7 +83,7 @@ function App() {
               >
                 指标监控
               </Button>
-            </ButtonGroup>
+            </Space.Compact>
           </div>
           {currentPage === 'knowledge' && (
             <Space size={8}>

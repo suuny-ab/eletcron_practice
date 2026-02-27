@@ -150,18 +150,23 @@ export async function* readEventStream(stream, signal) {
 
 /**
  * AI 知识库问答接口（RAG）
- * @param {string} question - 用户问题
- * @param {number} topK - 检索的文档数量
- * @param {AbortSignal} signal - 中断信号
+ * @param {Object} params - 请求参数
+ * @param {string} params.question - 用户问题
+ * @param {number} params.top_k - 检索的文档数量
+ * @param {Object} options - 请求选项
+ * @param {AbortSignal} options.signal - 中断信号
  * @returns {ReadableStream} 流式响应
  */
-export async function ragAskStream(question, topK = 3, signal) {
+export async function ragAskStream(params, options = {}) {
+  const { question, top_k = 3 } = params;
+  const { signal } = options;
+
   const response = await fetch(`${API_BASE_URL}/api/ai/rag`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question, top_k: topK }),
+    body: JSON.stringify({ question, top_k }),
     signal,
   });
 

@@ -16,7 +16,6 @@ import {
   Col,
   Typography,
   Tooltip,
-  Progress,
   Empty,
   Spin,
   InputNumber,
@@ -63,14 +62,20 @@ const TokensDisplay = ({ tokens }) => {
 const ScoreBar = ({ score, color = '#1890ff' }) => {
   const percentage = Math.min(Math.max(score * 100, 0), 100);
   return (
-    <Tooltip title={`${score.toFixed(4)}`}>
-      <Progress
-        percent={percentage}
-        size="small"
-        strokeColor={color}
-        format={() => score.toFixed(2)}
-        style={{ width: 120 }}
-      />
+    <Tooltip title={`原始值: ${score.toFixed(4)}`}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <div style={{ flex: 1, height: 6, background: '#f0f0f0', borderRadius: 3, overflow: 'hidden', minWidth: 40 }}>
+          <div
+            style={{
+              width: `${percentage}%`,
+              height: '100%',
+              background: color,
+              borderRadius: 3,
+            }}
+          />
+        </div>
+        <Text style={{ fontSize: 11, color: '#666', whiteSpace: 'nowrap' }}>{score.toFixed(2)}</Text>
+      </div>
     </Tooltip>
   );
 };
@@ -121,14 +126,14 @@ export function RAGDebugPanel() {
       title: '#',
       dataIndex: 'index',
       key: 'index',
-      width: 50,
+      width: 40,
       render: (_, __, idx) => idx + 1,
     },
     {
       title: '文件名',
       dataIndex: 'filename',
       key: 'filename',
-      width: 150,
+      width: 180,
       ellipsis: true,
       render: (text) => (
         <Tooltip title={text}>
@@ -140,77 +145,22 @@ export function RAGDebugPanel() {
       title: '原始距离',
       dataIndex: 'raw_distance',
       key: 'raw_distance',
-      width: 100,
+      width: 90,
       render: (val) => <Text type="secondary">{val?.toFixed(4)}</Text>,
     },
     {
       title: '相似度',
       dataIndex: 'similarity_score',
       key: 'similarity_score',
-      width: 100,
+      width: 110,
       render: (val) => <ScoreBar score={val || 0} color="#722ed1" />,
     },
     {
       title: '归一化得分',
       dataIndex: 'normalized_score',
       key: 'normalized_score',
-      width: 140,
+      width: 110,
       render: (val) => <ScoreBar score={val || 0} color="#1890ff" />,
-    },
-    {
-      title: '内容预览',
-      dataIndex: 'content',
-      key: 'content',
-      ellipsis: true,
-      render: (text) => (
-        <Tooltip title={text}>
-          <Text>{text?.slice(0, 100)}...</Text>
-        </Tooltip>
-      ),
-    },
-  ];
-
-  // BM25 检索结果表格列
-  const bm25Columns = [
-    {
-      title: '#',
-      dataIndex: 'index',
-      key: 'index',
-      width: 50,
-      render: (_, __, idx) => idx + 1,
-    },
-    {
-      title: '文件名',
-      dataIndex: 'filename',
-      key: 'filename',
-      width: 150,
-      ellipsis: true,
-      render: (text) => (
-        <Tooltip title={text}>
-          <Text code>{text}</Text>
-        </Tooltip>
-      ),
-    },
-    {
-      title: '原始得分',
-      dataIndex: 'raw_score',
-      key: 'raw_score',
-      width: 100,
-      render: (val) => <Text type="secondary">{val?.toFixed(4)}</Text>,
-    },
-    {
-      title: '归一化得分',
-      dataIndex: 'normalized_score',
-      key: 'normalized_score',
-      width: 140,
-      render: (val) => <ScoreBar score={val || 0} color="#fa8c16" />,
-    },
-    {
-      title: '分词结果',
-      dataIndex: 'tokens',
-      key: 'tokens',
-      width: 200,
-      render: (tokens) => <TokensDisplay tokens={tokens} />,
     },
     {
       title: '内容预览',
@@ -225,20 +175,75 @@ export function RAGDebugPanel() {
     },
   ];
 
-  // 混合候选表格列
-  const hybridColumns = [
+  // BM25 检索结果表格列
+  const bm25Columns = [
     {
       title: '#',
       dataIndex: 'index',
       key: 'index',
-      width: 50,
+      width: 40,
       render: (_, __, idx) => idx + 1,
     },
     {
       title: '文件名',
       dataIndex: 'filename',
       key: 'filename',
-      width: 150,
+      width: 180,
+      ellipsis: true,
+      render: (text) => (
+        <Tooltip title={text}>
+          <Text code>{text}</Text>
+        </Tooltip>
+      ),
+    },
+    {
+      title: '原始得分',
+      dataIndex: 'raw_score',
+      key: 'raw_score',
+      width: 90,
+      render: (val) => <Text type="secondary">{val?.toFixed(4)}</Text>,
+    },
+    {
+      title: '归一化得分',
+      dataIndex: 'normalized_score',
+      key: 'normalized_score',
+      width: 110,
+      render: (val) => <ScoreBar score={val || 0} color="#fa8c16" />,
+    },
+    {
+      title: '分词结果',
+      dataIndex: 'tokens',
+      key: 'tokens',
+      width: 180,
+      render: (tokens) => <TokensDisplay tokens={tokens} />,
+    },
+    {
+      title: '内容预览',
+      dataIndex: 'content',
+      key: 'content',
+      ellipsis: true,
+      render: (text) => (
+        <Tooltip title={text}>
+          <Text>{text?.slice(0, 60)}...</Text>
+        </Tooltip>
+      ),
+    },
+  ];
+
+  // 混合候选表格列
+  const hybridColumns = [
+    {
+      title: '#',
+      dataIndex: 'index',
+      key: 'index',
+      width: 40,
+      render: (_, __, idx) => idx + 1,
+    },
+    {
+      title: '文件名',
+      dataIndex: 'filename',
+      key: 'filename',
+      width: 160,
       ellipsis: true,
       render: (text) => <Text code>{text}</Text>,
     },
@@ -246,28 +251,28 @@ export function RAGDebugPanel() {
       title: '来源',
       dataIndex: 'source',
       key: 'source',
-      width: 90,
+      width: 80,
       render: (source) => <SourceTag source={source} />,
     },
     {
       title: '向量得分',
       dataIndex: 'vector_score',
       key: 'vector_score',
-      width: 130,
+      width: 100,
       render: (val) => <ScoreBar score={val || 0} color="#722ed1" />,
     },
     {
       title: 'BM25 得分',
       dataIndex: 'bm25_score',
       key: 'bm25_score',
-      width: 130,
+      width: 100,
       render: (val) => <ScoreBar score={val || 0} color="#fa8c16" />,
     },
     {
       title: '混合得分',
       dataIndex: 'hybrid_score',
       key: 'hybrid_score',
-      width: 130,
+      width: 100,
       render: (val) => <ScoreBar score={val || 0} color="#52c41a" />,
     },
     {
@@ -275,7 +280,7 @@ export function RAGDebugPanel() {
       dataIndex: 'content',
       key: 'content',
       ellipsis: true,
-      render: (text) => <Text>{text?.slice(0, 60)}...</Text>,
+      render: (text) => <Text>{text?.slice(0, 50)}...</Text>,
     },
   ];
 
@@ -285,14 +290,14 @@ export function RAGDebugPanel() {
       title: '原始排名',
       dataIndex: 'original_rank',
       key: 'original_rank',
-      width: 100,
+      width: 90,
       render: (val) => <Tag color="blue">#{val + 1}</Tag>,
     },
     {
       title: '最终排名',
       dataIndex: 'final_rank',
       key: 'final_rank',
-      width: 100,
+      width: 90,
       render: (val, record) =>
         record.selected ? (
           <Tag color="green">#{val + 1}</Tag>
@@ -304,7 +309,7 @@ export function RAGDebugPanel() {
       title: '状态',
       dataIndex: 'selected',
       key: 'selected',
-      width: 100,
+      width: 80,
       render: (selected) =>
         selected ? (
           <Tag icon={<CheckCircleOutlined />} color="success">
@@ -318,7 +323,7 @@ export function RAGDebugPanel() {
       title: '文件名',
       dataIndex: 'filename',
       key: 'filename',
-      width: 150,
+      width: 180,
       ellipsis: true,
       render: (text) => <Text code>{text}</Text>,
     },
@@ -326,7 +331,7 @@ export function RAGDebugPanel() {
       title: '混合得分',
       dataIndex: 'hybrid_score',
       key: 'hybrid_score',
-      width: 130,
+      width: 100,
       render: (val) => <ScoreBar score={val || 0} color="#52c41a" />,
     },
     {
@@ -334,53 +339,60 @@ export function RAGDebugPanel() {
       dataIndex: 'content',
       key: 'content',
       ellipsis: true,
-      render: (text) => <Text>{text?.slice(0, 80)}...</Text>,
+      render: (text) => <Text>{text?.slice(0, 60)}...</Text>,
     },
   ];
 
   return (
-    <div style={{ padding: '24px' }}>
-      <Title level={3}>RAG 调试面板</Title>
-      <Text type="secondary">
-        可视化展示 RAG 检索流程：向量检索、BM25 检索、混合评分、LLM 重排序
-      </Text>
+    <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
+      <div style={{ marginBottom: 24 }}>
+        <Title level={3} style={{ marginBottom: 8 }}>RAG 调试面板</Title>
+        <Text type="secondary">
+          可视化展示 RAG 检索流程：向量检索、BM25 检索、混合评分、LLM 重排序
+        </Text>
+      </div>
 
       {/* 查询输入区 */}
-      <Card style={{ marginTop: 16 }}>
-        <Space direction="vertical" style={{ width: '100%' }}>
-          <TextArea
-            placeholder="输入查询内容以调试 RAG 检索流程..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            rows={2}
-            onPressEnter={(e) => {
-              if (e.ctrlKey) handleDebugQuery();
-            }}
-          />
-          <Space>
-            <InputNumber
-              addonBefore="Top-K"
-              min={1}
-              max={10}
-              value={topK}
-              onChange={setTopK}
-              style={{ width: 140 }}
+      <Card style={{ marginBottom: 16 }}>
+        <Row gutter={16} align="middle">
+          <Col flex="auto">
+            <TextArea
+              placeholder="输入查询内容以调试 RAG 检索流程..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              rows={2}
+              onPressEnter={(e) => {
+                if (e.ctrlKey) handleDebugQuery();
+              }}
             />
-            <Button
-              type="primary"
-              icon={<SearchOutlined />}
-              onClick={handleDebugQuery}
-              loading={loading}
-            >
-              调试查询
-            </Button>
-          </Space>
-        </Space>
+          </Col>
+          <Col>
+            <Space direction="vertical">
+              <InputNumber
+                addonBefore="Top-K"
+                min={1}
+                max={10}
+                value={topK}
+                onChange={setTopK}
+                style={{ width: 120 }}
+              />
+              <Button
+                type="primary"
+                icon={<SearchOutlined />}
+                onClick={handleDebugQuery}
+                loading={loading}
+                block
+              >
+                调试查询
+              </Button>
+            </Space>
+          </Col>
+        </Row>
       </Card>
 
       {/* 加载状态 */}
       {loading && (
-        <div style={{ textAlign: 'center', padding: '40px' }}>
+        <div style={{ textAlign: 'center', padding: '60px' }}>
           <Spin size="large" tip="正在分析检索流程..." />
         </div>
       )}
@@ -388,33 +400,35 @@ export function RAGDebugPanel() {
       {/* 调试结果 */}
       {debugInfo && !loading && (
         <>
-          {/* 查询信息和耗时统计 */}
-          <Row gutter={16} style={{ marginTop: 16 }}>
+          {/* 查询信息和检索配置 */}
+          <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={16}>
-              <Card title="查询信息" size="small">
-                <Space direction="vertical">
-                  <Text strong>查询内容: </Text>
+              <Card size="small" style={{ height: '100%' }}>
+                <div style={{ marginBottom: 12 }}>
+                  <Text strong style={{ display: 'block', marginBottom: 4 }}>查询内容</Text>
                   <Text>{debugInfo.query}</Text>
-                  <Text strong>查询分词: </Text>
+                </div>
+                <div>
+                  <Text strong style={{ display: 'block', marginBottom: 4 }}>查询分词</Text>
                   <TokensDisplay tokens={debugInfo.query_tokens} />
-                </Space>
+                </div>
               </Card>
             </Col>
             <Col span={8}>
-              <Card title="检索配置" size="small">
-                <Row gutter={[8, 8]}>
+              <Card title="检索配置" size="small" style={{ height: '100%' }}>
+                <Row gutter={[12, 12]}>
                   <Col span={12}>
                     <Statistic
                       title="向量 Top-K"
                       value={debugInfo.config?.vector_top_k}
-                      valueStyle={{ fontSize: 16 }}
+                      valueStyle={{ fontSize: 18 }}
                     />
                   </Col>
                   <Col span={12}>
                     <Statistic
                       title="BM25 Top-K"
                       value={debugInfo.config?.bm25_top_k}
-                      valueStyle={{ fontSize: 16 }}
+                      valueStyle={{ fontSize: 18 }}
                     />
                   </Col>
                   <Col span={12}>
@@ -422,7 +436,7 @@ export function RAGDebugPanel() {
                       title="向量权重"
                       value={debugInfo.config?.vector_weight}
                       precision={2}
-                      valueStyle={{ fontSize: 16 }}
+                      valueStyle={{ fontSize: 18 }}
                     />
                   </Col>
                   <Col span={12}>
@@ -430,7 +444,7 @@ export function RAGDebugPanel() {
                       title="BM25 权重"
                       value={debugInfo.config?.bm25_weight}
                       precision={2}
-                      valueStyle={{ fontSize: 16 }}
+                      valueStyle={{ fontSize: 18 }}
                     />
                   </Col>
                 </Row>
@@ -447,7 +461,7 @@ export function RAGDebugPanel() {
               </Space>
             }
             size="small"
-            style={{ marginTop: 16 }}
+            style={{ marginBottom: 16 }}
           >
             <Row gutter={16}>
               <Col span={4}>
@@ -455,7 +469,7 @@ export function RAGDebugPanel() {
                   title="向量检索"
                   value={debugInfo.timing?.vector_search_ms}
                   suffix="ms"
-                  valueStyle={{ color: '#722ed1' }}
+                  valueStyle={{ color: '#722ed1', fontSize: 18 }}
                 />
               </Col>
               <Col span={4}>
@@ -463,7 +477,7 @@ export function RAGDebugPanel() {
                   title="BM25 检索"
                   value={debugInfo.timing?.bm25_search_ms}
                   suffix="ms"
-                  valueStyle={{ color: '#fa8c16' }}
+                  valueStyle={{ color: '#fa8c16', fontSize: 18 }}
                 />
               </Col>
               <Col span={4}>
@@ -471,7 +485,7 @@ export function RAGDebugPanel() {
                   title="混合评分"
                   value={debugInfo.timing?.merge_ms}
                   suffix="ms"
-                  valueStyle={{ color: '#1890ff' }}
+                  valueStyle={{ color: '#1890ff', fontSize: 18 }}
                 />
               </Col>
               <Col span={4}>
@@ -479,7 +493,7 @@ export function RAGDebugPanel() {
                   title="LLM 重排序"
                   value={debugInfo.timing?.rerank_ms}
                   suffix="ms"
-                  valueStyle={{ color: '#52c41a' }}
+                  valueStyle={{ color: '#52c41a', fontSize: 18 }}
                 />
               </Col>
               <Col span={4}>
@@ -487,7 +501,15 @@ export function RAGDebugPanel() {
                   title="总耗时"
                   value={debugInfo.timing?.total_ms}
                   suffix="ms"
-                  valueStyle={{ color: '#f5222d', fontWeight: 'bold' }}
+                  valueStyle={{ color: '#f5222d', fontWeight: 'bold', fontSize: 18 }}
+                />
+              </Col>
+              <Col span={4}>
+                <Statistic
+                  title="结果数量"
+                  value={debugInfo.final_sources?.length || 0}
+                  suffix="条"
+                  valueStyle={{ fontSize: 18 }}
                 />
               </Col>
             </Row>
@@ -496,7 +518,7 @@ export function RAGDebugPanel() {
           {/* 检索步骤详情 */}
           <Collapse
             defaultActiveKey={['vector', 'bm25', 'hybrid', 'rerank']}
-            style={{ marginTop: 16 }}
+            style={{ marginBottom: 16 }}
           >
             {/* 向量检索 */}
             <Panel
@@ -516,7 +538,7 @@ export function RAGDebugPanel() {
                   rowKey={(_, idx) => idx}
                   size="small"
                   pagination={false}
-                  scroll={{ x: 800 }}
+                  scroll={{ x: 900 }}
                 />
               ) : (
                 <Empty description="无向量检索结果" />
@@ -541,7 +563,7 @@ export function RAGDebugPanel() {
                   rowKey={(_, idx) => idx}
                   size="small"
                   pagination={false}
-                  scroll={{ x: 900 }}
+                  scroll={{ x: 1000 }}
                 />
               ) : (
                 <Empty description="无 BM25 检索结果" />
@@ -566,7 +588,7 @@ export function RAGDebugPanel() {
                   rowKey={(_, idx) => idx}
                   size="small"
                   pagination={false}
-                  scroll={{ x: 900 }}
+                  scroll={{ x: 1000 }}
                 />
               ) : (
                 <Empty description="无混合候选" />
@@ -593,7 +615,7 @@ export function RAGDebugPanel() {
                   rowKey={(_, idx) => idx}
                   size="small"
                   pagination={false}
-                  scroll={{ x: 800 }}
+                  scroll={{ x: 900 }}
                   rowClassName={(record) => (record.selected ? 'selected-row' : '')}
                 />
               ) : (
@@ -611,10 +633,9 @@ export function RAGDebugPanel() {
                 <Tag color="success">{debugInfo.final_sources?.length || 0} 篇文档</Tag>
               </Space>
             }
-            style={{ marginTop: 16 }}
           >
             {debugInfo.final_sources?.length > 0 ? (
-              <Space direction="vertical" style={{ width: '100%' }}>
+              <Space direction="vertical" style={{ width: '100%' }} size="middle">
                 {debugInfo.final_sources.map((source, idx) => (
                   <Card
                     key={idx}
@@ -622,13 +643,14 @@ export function RAGDebugPanel() {
                     title={
                       <Space>
                         <Tag color="blue">#{idx + 1}</Tag>
-                        <Text code>{source.filename}</Text>
+                        <Text code style={{ fontSize: 13 }}>{source.filename}</Text>
                         <Text type="secondary">得分: {source.score?.toFixed(4)}</Text>
                       </Space>
                     }
                     size="small"
+                    style={{ background: '#fafafa' }}
                   >
-                    <Text>{source.content}</Text>
+                    <Text style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{source.content}</Text>
                   </Card>
                 ))}
               </Space>
@@ -641,7 +663,7 @@ export function RAGDebugPanel() {
 
       {/* 空状态 */}
       {!debugInfo && !loading && (
-        <div style={{ textAlign: 'center', padding: '60px' }}>
+        <div style={{ textAlign: 'center', padding: '80px 20px' }}>
           <Empty
             description="输入查询内容并点击「调试查询」以分析 RAG 检索流程"
             image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -652,6 +674,12 @@ export function RAGDebugPanel() {
       <style>{`
         .selected-row {
           background-color: #f6ffed !important;
+        }
+        .ant-card-head-title {
+          padding: 12px 0;
+        }
+        .ant-statistic-title {
+          font-size: 12px;
         }
       `}</style>
     </div>

@@ -282,6 +282,7 @@ export function useNoteManager(configTabVisible, configTabRequestId, onConfigTab
 
     // 状态设置器
     setActiveMainTab,
+    setOpenChunks,
 
     // 方法
     updateTabForConfig,

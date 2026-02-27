@@ -56,7 +56,7 @@ export function useRAG() {
     }]);
 
     try {
-      const response = await ragAskStream(
+      const stream = await ragAskStream(
         { question, top_k: options.topK || ragTopK },
         { signal: abortControllerRef.current.signal }
       );
@@ -64,12 +64,12 @@ export function useRAG() {
       let fullContent = '';
       let sources = [];
 
-      await readEventStream(response, {
-        onChunk: (chunk) => {
-          // 检查是否仍是当前查询
-          if (queryIdRef.current !== thisQueryId) return;
+      for await (const event of readEventStream(stream, abortControllerRef.current.signal)) {
+        // 检查是否仍是当前查询
+        if (queryIdRef.current !== thisQueryId) return;
 
-          fullContent += chunk;
+        if (event.type === 'chunk') {
+          fullContent += event.content || '';
           setRagMessages(prev => {
             const newMessages = [...prev];
             if (newMessages.length > 0) {
@@ -80,14 +80,14 @@ export function useRAG() {
             }
             return newMessages;
           });
-        },
-        onSources: (newSources) => {
-          if (queryIdRef.current !== thisQueryId) return;
-          sources = newSources;
-          setRagSources(newSources);
-        },
-        signal: abortControllerRef.current.signal,
-      });
+        } else if (event.type === 'source') {
+          sources.push(event.data);
+          setRagSources([...sources]);
+        } else if (event.type === 'complete') {
+          // 流结束
+          break;
+        }
+      }
 
       // 标记流式传输完成
       setRagMessages(prev => {

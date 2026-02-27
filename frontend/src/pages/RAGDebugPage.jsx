@@ -5,7 +5,7 @@
 import { Typography } from 'antd';
 import { BugOutlined } from '@ant-design/icons';
 import { RAGDebugPanel } from '../components/RAGDebug';
-import { COLORS } from '../styles/tokens';
+import { COLORS, SHADOWS } from '../styles/tokens';
 
 const { Title } = Typography;
 

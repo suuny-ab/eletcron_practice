@@ -152,6 +152,17 @@ class IndexService:
             actual_count = collection.count()
             expected_count = marker.get("chunk_count", 0)
 
+            if actual_count == 0 and expected_count == 0:
+                # 标记和向量库都为空，检查是否有实际文件需要索引
+                md_files = list(self._notes_root.rglob("*.md"))
+                md_files.extend(list(self._notes_root.rglob("*.markdown")))
+                if md_files:
+                    logger.info(f"[RAG] 发现 {len(md_files)} 个文件需要索引，重新索引")
+                    self._remove_index_marker()
+                    return False
+                # 确实没有文件，跳过索引
+                return True
+
             if actual_count == 0 and expected_count > 0:
                 logger.info("[RAG] 向量库数据丢失，重新索引")
                 self._remove_index_marker()

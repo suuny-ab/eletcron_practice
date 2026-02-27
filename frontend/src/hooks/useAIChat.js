@@ -37,18 +37,18 @@ export function useAIChat() {
 
     try {
       const response = await aiAdvise(
-        { filename, question },
-        { signal: abortControllerRef.current.signal }
+        filename,
+        question,
+        abortControllerRef.current.signal
       );
 
       let fullContent = '';
-      await readEventStream(response, {
-        onChunk: (chunk) => {
-          fullContent += chunk;
-          onChunk?.(chunk, fullContent);
-        },
-        signal: abortControllerRef.current.signal,
-      });
+      for await (const event of readEventStream(response, abortControllerRef.current.signal)) {
+        if (event.type === 'chunk' && event.content) {
+          fullContent += event.content;
+          onChunk?.(event.content, fullContent);
+        }
+      }
 
       return fullContent;
     } catch (error) {
@@ -74,18 +74,18 @@ export function useAIChat() {
 
     try {
       const response = await aiEdit(
-        { filename, requirement },
-        { signal: abortControllerRef.current.signal }
+        filename,
+        requirement,
+        abortControllerRef.current.signal
       );
 
       let fullContent = '';
-      await readEventStream(response, {
-        onChunk: (chunk) => {
-          fullContent += chunk;
-          onChunk?.(chunk, fullContent);
-        },
-        signal: abortControllerRef.current.signal,
-      });
+      for await (const event of readEventStream(response, abortControllerRef.current.signal)) {
+        if (event.type === 'chunk' && event.content) {
+          fullContent += event.content;
+          onChunk?.(event.content, fullContent);
+        }
+      }
 
       return fullContent;
     } catch (error) {
@@ -111,18 +111,17 @@ export function useAIChat() {
 
     try {
       const response = await aiOptimize(
-        { filename },
-        { signal: abortControllerRef.current.signal }
+        filename,
+        abortControllerRef.current.signal
       );
 
       let fullContent = '';
-      await readEventStream(response, {
-        onChunk: (chunk) => {
-          fullContent += chunk;
-          onChunk?.(chunk, fullContent);
-        },
-        signal: abortControllerRef.current.signal,
-      });
+      for await (const event of readEventStream(response, abortControllerRef.current.signal)) {
+        if (event.type === 'chunk' && event.content) {
+          fullContent += event.content;
+          onChunk?.(event.content, fullContent);
+        }
+      }
 
       return fullContent;
     } catch (error) {

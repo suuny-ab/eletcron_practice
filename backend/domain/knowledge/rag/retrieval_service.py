@@ -35,6 +35,18 @@ class RetrievalService:
         self._bm25_index = bm25_index
         self._llm_task_service = llm_task_service
 
+    def _distance_to_similarity(self, distance: float) -> float:
+        """
+        将距离转换为相似度得分
+        
+        使用指数衰减函数：exp(-distance * alpha)
+        - alpha = 0.5 时：距离 0 -> 1.0, 距离 1 -> 0.61, 距离 2 -> 0.37
+        - 比 1/(1+x) 有更好的区分度
+        """
+        import math
+        alpha = 0.5  # 衰减系数，可根据实际情况调整
+        return math.exp(-distance * alpha)
+
     def _normalize_scores(self, scores: list[float]) -> list[float]:
         """将分数归一化到0-1区间"""
         if not scores:
@@ -127,7 +139,7 @@ class RetrievalService:
             vector_docs: list[tuple] = []
             for doc, score in vector_results:
                 raw_score = float(score)
-                sim_score = 1.0 / (1.0 + raw_score)
+                sim_score = self._distance_to_similarity(raw_score)
                 vector_sims.append(sim_score)
                 vector_docs.append((doc, raw_score))
 
@@ -269,7 +281,7 @@ class RetrievalService:
         vector_docs: list[tuple] = []
         for doc, score in vector_results:
             raw_score = float(score)
-            sim_score = 1.0 / (1.0 + raw_score)
+            sim_score = self._distance_to_similarity(raw_score)
             vector_sims.append(sim_score)
             vector_docs.append((doc, raw_score, sim_score))
 

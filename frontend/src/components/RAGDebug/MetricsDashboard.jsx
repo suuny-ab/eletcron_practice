@@ -227,8 +227,11 @@ export function MetricsDashboard() {
   // RAG 相关指标
   const ragRetrievalDuration = histograms['rag.retrieval.duration_seconds'];
   const ragRetrievalQueries = counters['rag.retrieval.queries'];
-  const ragIndexFilesIndexed = counters['rag.index.files_indexed'];
-  const ragIndexChunksIndexed = counters['rag.index.chunks_indexed'];
+
+  // 从健康检查数据中获取 RAG 服务的索引统计（持久化数据）
+  const ragService = healthData?.services?.find(s => s.name === 'rag');
+  const ragIndexFiles = ragService?.details?.indexed_files || 0;
+  const ragIndexChunks = ragService?.details?.indexed_chunks || 0;
 
   // LLM 相关指标
   const llmCalls = counters['llm.calls'];
@@ -361,13 +364,13 @@ export function MetricsDashboard() {
                         <span>索引统计</span>
                       </Space>
                     }
-                    value={ragIndexFilesIndexed?.value || 0}
+                    value={ragIndexFiles}
                     suffix="个文件"
                     valueStyle={{ color: '#52c41a' }}
                   />
                   <Divider style={{ margin: '8px 0' }} />
                   <Text type="secondary">
-                    已索引 {ragIndexChunksIndexed?.value || 0} 个文档块
+                    已索引 {ragIndexChunks} 个文档块
                   </Text>
                 </Card>
               </Col>
