@@ -141,14 +141,9 @@ class IndexService:
             logger.warning(f"[RAG] 删除索引标记失败: {e}")
 
     def _should_skip_full_index(self) -> bool:
-        """判断是否应跳过全量索引"""
+        """判断是否应跳过全量索引（标记文件存在 + 向量库数据有效）"""
         marker = self._load_index_marker()
         if not marker:
-            return False
-
-        if marker.get("notes_root") != str(self._notes_root):
-            logger.info("[RAG] 索引标记与当前笔记目录不一致，重新索引")
-            self._remove_index_marker()
             return False
 
         # 验证向量库中实际数据量
@@ -269,6 +264,13 @@ class IndexService:
             if self._stop_event.is_set():
                 logger.info("[RAG] 收到停止信号，中断索引")
                 return
+
+            # 清理向量库中的旧数据，避免数据累积
+            try:
+                self._vectorstore._collection.delete()
+                logger.info("[RAG] 已清理向量库旧数据")
+            except Exception as e:
+                logger.warning(f"[RAG] 清理向量库失败: {e}，继续索引")
 
             # 切分并添加文档
             documents = self._collect_documents_from_files(md_files)
