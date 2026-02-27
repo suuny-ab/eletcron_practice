@@ -8,6 +8,16 @@ from collections.abc import Callable, AsyncGenerator
 from typing import cast
 import json
 
+from starlette.responses import StreamingResponse
+
+
+# 流式响应通用 Headers
+STREAM_HEADERS = {
+    "Cache-Control": "no-cache",
+    "X-Accel-Buffering": "no",
+    "Connection": "keep-alive",
+}
+
 
 def create_json_stream(
     stream_generator: Callable[..., AsyncGenerator[object, None]],
@@ -73,3 +83,30 @@ def create_json_stream(
             yield json.dumps({"type": "error", "content": error_message}, ensure_ascii=False) + "\n"
 
     return generate
+
+
+def create_streaming_response(
+    stream_generator: Callable[..., AsyncGenerator[object, None]],
+    *args: object,
+    **kwargs: object
+) -> StreamingResponse:
+    """
+    创建流式响应，封装 create_json_stream 和 StreamingResponse
+    
+    Args:
+        stream_generator: 服务层的流式生成器函数
+        *args: 传递给生成器的位置参数
+        **kwargs: 传递给生成器的关键字参数
+        
+    Returns:
+        StreamingResponse 实例
+        
+    Examples:
+        >>> return create_streaming_response(ai_service.optimize_stream, filename)
+    """
+    generate = create_json_stream(stream_generator, *args, **kwargs)
+    return StreamingResponse(
+        generate(),
+        media_type="application/x-ndjson",
+        headers=STREAM_HEADERS
+    )

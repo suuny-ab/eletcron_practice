@@ -9,6 +9,7 @@ from app.schemas.requests import UpdateConfigRequest
 from app.schemas.responses import DataResponse, BaseResponse, ConfigData
 from infrastructure.logging.logger import get_logger
 from core.exceptions import NotFoundException, ConfigError
+from utils import mask_api_key
 
 
 logger = get_logger(__name__)
@@ -31,12 +32,10 @@ async def get_config(request: Request):
     except ConfigError:
         raise NotFoundException("配置文件不存在，请先创建配置")
 
-    api_key_masked = f"****{config.api_key[-4:]}" if config.api_key else ""
-
     return DataResponse[ConfigData](
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
-            api_key=api_key_masked,
+            api_key=mask_api_key(config.api_key),
             model_name=config.model_name,
             prompts=config.prompts
         )
@@ -75,12 +74,10 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
     # 更新配置（自动持久化并触发监听器）
     config_context.update(config)
 
-    api_key_masked = f"****{config.api_key[-4:]}" if config.api_key else ""
-
     return DataResponse[ConfigData](
         data=ConfigData(
             obsidian_vault_path=config.obsidian_vault_path,
-            api_key=api_key_masked,
+            api_key=mask_api_key(config.api_key),
             model_name=config.model_name,
             prompts=config.prompts
         ),
