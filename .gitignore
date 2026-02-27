@@ -78,6 +78,14 @@ web_modules/
 .env.*
 !.env.example
 
+# Python test coverage
+.coverage
+htmlcov/
+*.cover
+
+# Windows special files
+nul
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache
