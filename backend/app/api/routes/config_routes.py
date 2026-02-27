@@ -4,7 +4,7 @@
 """
 from fastapi import APIRouter, Request
 
-from infrastructure.config.config_manager import config_manager
+from infrastructure.config.config_context import ConfigModel
 from schemas.requests import UpdateConfigRequest
 from schemas.responses import DataResponse, BaseResponse, ConfigData
 from infrastructure.logging.logger import get_logger
@@ -55,33 +55,25 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
     Returns:
         DataResponse[ConfigData]: 包含更新后配置数据的响应
     """
+    config_context = http_request.app.state.config_context
+
     # 如果前端回传掩码或空字符串，则沿用已有 api_key
-    existing_config = config_manager.read_config()
+    existing_config = config_context.read_config(ConfigModel)
     api_key = request.api_key
     if existing_config and (not api_key or api_key.startswith("****")):
         api_key = existing_config.api_key
 
-    # 构建配置对象（不写入磁盘）
-    config = config_manager.build_config(
+    # 构建配置对象
+    config = config_context.build_config(
+        config_class=ConfigModel,
         obsidian_vault_path=request.obsidian_vault_path,
         api_key=api_key,
         model_name=request.model_name,
         prompts=request.prompts
     )
 
-    # 先写入配置文件，落盘成功才允许生效
-    config_manager.save_config(config)
-
-    # 落盘成功后再更新运行时配置（自动触发所有监听器，包括提示词更新）
-    config_context = http_request.app.state.config_context
-    try:
-        config_context.update(config)
-    except Exception:
-        if existing_config:
-            config_manager.save_config(existing_config)
-        else:
-            config_manager.delete_config()
-        raise
+    # 更新配置（自动持久化并触发监听器）
+    config_context.update(config)
 
     api_key_masked = f"****{config.api_key[-4:]}" if config.api_key else ""
 
@@ -97,16 +89,16 @@ async def update_config(request: UpdateConfigRequest, http_request: Request):
 
 
 @router.delete("", response_model=BaseResponse)
-async def delete_config():
+async def delete_config(http_request: Request):
     """
     删除配置
 
     Returns:
         BaseResponse: 操作结果响应
     """
-    success = config_manager.delete_config()
+    config_context = http_request.app.state.config_context
+    success = config_context.delete_config()
     if not success:
-        from ....core.exceptions import NotFoundException
         raise NotFoundException("配置文件不存在，无需删除")
 
     return BaseResponse(message="配置删除成功")

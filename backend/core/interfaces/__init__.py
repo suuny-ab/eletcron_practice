@@ -12,16 +12,13 @@ from .knowledge import (
     IKnowledgeService,
     IRAGService,
 )
-from .config import (
-    IConfigContext,
-    IConfigManager,
-)
+from .config import IConfigContext
 from .storage import IDocumentProcessor
 
 __all__ = [
     # AI
     "IModelProvider",
-    "IChatModelService", 
+    "IChatModelService",
     "ILLMTaskService",
     # Knowledge
     "IKnowledgeRepository",
@@ -29,7 +26,6 @@ __all__ = [
     "IRAGService",
     # Config
     "IConfigContext",
-    "IConfigManager",
     # Storage
     "IDocumentProcessor",
 ]

@@ -12,7 +12,6 @@ from core.interfaces import (
     IKnowledgeService,
 )
 from infrastructure.config.config_context import ConfigContext
-from infrastructure.config.config_manager import config_manager
 from domain.ai.models.model_provider import ModelProvider
 from domain.ai.services.chat_model import ChatModelService
 from domain.ai.services.llm_task_service import LLMTaskService

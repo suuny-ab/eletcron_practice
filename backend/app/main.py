@@ -15,8 +15,8 @@ from .api.routes import ai_router, config_router, knowledge_router
 from core import register_exception_handlers
 from infrastructure.logging.logger import get_logger
 
-# 导入配置管理器
-from infrastructure.config.config_manager import config_manager
+# 导入配置模型
+from infrastructure.config.config_context import ConfigModel
 
 # 导入模型提供者（具体实现）
 from domain.ai.models.model_provider import ModelProvider
@@ -64,13 +64,13 @@ async def lifespan(app: FastAPI):
     
     # 尝试从配置文件加载配置
     try:
-        config = config_manager.read_config()
+        config = app.state.config_context.read_config(ConfigModel)
         if config:
             logger.info(f"已加载配置: Obsidian Vault={config.obsidian_vault_path}, 模型={config.model_name}")
-            
-            # 更新配置上下文（自动触发所有监听器）
-            app.state.config_context.update(config)
-            
+
+            # 更新配置上下文（不持久化，因为只是从磁盘加载）
+            app.state.config_context.update(config, persist=False)
+
             # 启动时自动清理孤儿会话
             if config.obsidian_vault_path:
                 cleaned_count = await app.state.cleanup_service.cleanup_orphaned_sessions()
