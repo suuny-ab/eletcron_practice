@@ -27,6 +27,7 @@ class HeaderNode:
     parent: "HeaderNode | None"
     children: list["HeaderNode"]
     content_lines: list[str]
+    merged_from: list["HeaderNode"]  # 记录合并来源的节点
 
     def __init__(self, level: int, title: str, parent: "HeaderNode | None" = None):
         self.level = level
@@ -34,6 +35,7 @@ class HeaderNode:
         self.parent = parent
         self.children = []
         self.content_lines = []
+        self.merged_from = []  # 初始化为空列表
 
     @property
     def is_leaf(self) -> bool:
@@ -89,16 +91,35 @@ class HeaderTreeBuilder:
             HeaderTreeBuilder._materialize_intro_nodes(child)
 
     @staticmethod
-    def get_subtree_text(node: HeaderNode) -> str:
-        """获取节点子树的完整文本"""
+    def get_subtree_text(node: HeaderNode, include_title: bool = True) -> str:
+        """
+        获取节点子树的完整文本
+        
+        Args:
+            node: 标题树节点
+            include_title: 是否包含节点标题（默认True）
+        
+        Returns:
+            包含标题（如有）和内容的完整文本
+        """
         parts: list[str] = []
+        
+        # 如果节点有标题且需要包含，添加标题行
+        if include_title and node.title:
+            header_prefix = "#" * node.level
+            parts.append(f"{header_prefix} {node.title}")
+        
+        # 添加节点内容
         text = "\n".join(node.content_lines).strip()
         if text:
             parts.append(text)
+        
+        # 递归添加子节点内容（子节点总是包含自己的标题）
         for child in node.children:
-            child_text = HeaderTreeBuilder.get_subtree_text(child)
+            child_text = HeaderTreeBuilder.get_subtree_text(child, include_title=True)
             if child_text:
                 parts.append(child_text)
+        
         return "\n\n".join(parts).strip()
 
     @staticmethod
@@ -117,10 +138,21 @@ class HeaderTreeBuilder:
             HeaderTreeBuilder.collapse_small_sections(child, max_len)
 
     @staticmethod
-    def create_merged_leaf(parent: HeaderNode, text: str) -> HeaderNode:
-        """创建合并后的虚拟叶子节点"""
+    def create_merged_leaf(parent: HeaderNode, text: str, merged_nodes: list["HeaderNode"]) -> HeaderNode:
+        """
+        创建合并后的虚拟叶子节点
+        
+        Args:
+            parent: 父节点
+            text: 合并后的文本内容
+            merged_nodes: 被合并的源节点列表，用于保留标题元数据
+        
+        Returns:
+            合并后的叶子节点
+        """
         merged = HeaderNode(level=parent.level + 1, title="", parent=parent)
         merged.content_lines = [text]
+        merged.merged_from = merged_nodes
         return merged
 
     @staticmethod
@@ -136,6 +168,7 @@ class HeaderTreeBuilder:
         new_children: list[HeaderNode] = []
         buffer_node: HeaderNode | None = None
         buffer_text = ""
+        buffer_merged: list[HeaderNode] = []  # 追踪被合并的节点
 
         for child in node.children:
             if not child.is_leaf:
@@ -143,6 +176,7 @@ class HeaderTreeBuilder:
                     new_children.append(buffer_node)
                     buffer_node = None
                     buffer_text = ""
+                    buffer_merged = []
                 new_children.append(child)
                 continue
 
@@ -153,16 +187,24 @@ class HeaderTreeBuilder:
             if buffer_node is None:
                 buffer_node = child
                 buffer_text = child_text
+                buffer_merged = [child] if child.title or child.merged_from else []
                 continue
 
             combined_text = _join_texts(buffer_text, child_text)
             if len(combined_text) <= max_len:
                 buffer_text = combined_text
-                buffer_node = HeaderTreeBuilder.create_merged_leaf(node, buffer_text)
+                # 追加当前节点到合并列表
+                if child.title or child.merged_from:
+                    buffer_merged.append(child)
+                # 如果当前节点本身是合并节点，也包含其来源
+                if child.merged_from:
+                    buffer_merged.extend(child.merged_from)
+                buffer_node = HeaderTreeBuilder.create_merged_leaf(node, buffer_text, buffer_merged)
             else:
                 new_children.append(buffer_node)
                 buffer_node = child
                 buffer_text = child_text
+                buffer_merged = [child] if child.title or child.merged_from else []
 
         if buffer_node:
             new_children.append(buffer_node)
@@ -183,19 +225,42 @@ class HeaderTreeBuilder:
         node: HeaderNode,
         headers_to_split_on: list[tuple[str, str]]
     ) -> JsonDict:
-        """根据节点路径生成标题层级元数据"""
+        """
+        根据节点路径生成标题层级元数据
+        
+        对于合并节点，会：
+        1. 使用第一个源节点的标题路径作为主分类
+        2. 在 merged_headers 中记录所有合并的标题
+        """
         level_to_header = {
             len(prefix): header_key for prefix, header_key in headers_to_split_on
         }
         metadata: JsonDict = {}
+        
+        # 收集标题路径
         path: list[HeaderNode] = []
-        current = node
+        
+        # 如果是合并节点，使用第一个源节点的标题路径
+        primary_node = node.merged_from[0] if node.merged_from else node
+        current = primary_node
         while current:
             if current.title:
                 path.append(current)
             current = current.parent
+        
+        # 构建主标题层级元数据
         for item in reversed(path):
             header_key = level_to_header.get(item.level)
             if header_key:
                 metadata[header_key] = item.title
+        
+        # 如果是合并节点，收集所有合并的标题
+        if node.merged_from:
+            merged_titles: list[str] = []
+            for source_node in node.merged_from:
+                if source_node.title:
+                    merged_titles.append(source_node.title)
+            if merged_titles:
+                metadata["merged_headers"] = merged_titles
+        
         return metadata
