@@ -11,8 +11,11 @@ from pathlib import Path
 from typing import Any, Callable, Awaitable
 
 from infrastructure.logging.logger import get_logger
+from infrastructure.metrics import get_metrics
+from paths import SESSIONS_DIR
 
 logger = get_logger(__name__)
+metrics = get_metrics()
 
 
 @dataclass
@@ -61,8 +64,7 @@ class SessionMetadataManager:
             base_dir: 会话存储目录，默认为 .data/ai_sessions/
             title_generator: 标题生成函数（LLM 调用），接收用户输入返回标题
         """
-        backend_dir = Path(__file__).resolve().parents[3]
-        self.base_dir = base_dir or (backend_dir / ".data" / "ai_sessions")
+        self.base_dir = base_dir or SESSIONS_DIR
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
         self.metadata_file = self.base_dir / self.METADATA_FILENAME
@@ -181,6 +183,7 @@ class SessionMetadataManager:
         metadata[session_id] = session
         self._save_metadata()
         
+        metrics.increment("session.create.count")
         logger.info(f"创建会话元数据: {session_id}")
         return session
     
@@ -247,31 +250,37 @@ class SessionMetadataManager:
     def delete_session(self, session_id: str) -> bool:
         """删除会话
         
-        同时删除 .jsonl 文件和元数据
+        先删除 .jsonl 文件，再删除元数据，避免中间状态不一致
         
         Args:
             session_id: 会话 ID
             
         Returns:
-            操作是否成功
+            是否实际删除了会话（False 表示会话不存在）
         """
         metadata = self._load_metadata()
         
-        # 删除元数据
-        if session_id in metadata:
-            del metadata[session_id]
-            self._save_metadata()
+        existed = session_id in metadata
         
-        # 删除 .jsonl 文件
+        # 先删除 .jsonl 文件（即使元数据不存在也要清理）
         safe_id = session_id.replace("/", "_").replace("\\", "_")
         jsonl_file = self.base_dir / f"{safe_id}.jsonl"
         
         if jsonl_file.exists():
             jsonl_file.unlink()
             logger.info(f"删除会话文件: {jsonl_file}")
+            existed = True
         
-        logger.info(f"删除会话: {session_id}")
-        return True
+        # 再删除元数据
+        if session_id in metadata:
+            del metadata[session_id]
+            self._save_metadata()
+        
+        if existed:
+            metrics.increment("session.delete.count")
+            logger.info(f"删除会话: {session_id}")
+        
+        return existed
     
     def session_exists(self, session_id: str) -> bool:
         """检查会话是否存在"""

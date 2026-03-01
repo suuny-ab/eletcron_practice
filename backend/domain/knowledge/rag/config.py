@@ -2,10 +2,10 @@
 RAG 配置文件
 定义RAG技术参数
 """
-from pathlib import Path
+from paths import VECTOR_DB_DIR
 
 # ==================== 向量数据库配置 ====================
-VECTOR_DB_PATH = (Path(__file__).resolve().parents[3] / ".data" / "chroma_db")  # 向量数据库存储路径，对用户透明
+VECTOR_DB_PATH = VECTOR_DB_DIR  # 向量数据库存储路径，对用户透明
 INDEX_MARKER_PATH = VECTOR_DB_PATH / "rag_index.done"  # 索引完成标记文件
 
 # ==================== 文档切分配置 ====================

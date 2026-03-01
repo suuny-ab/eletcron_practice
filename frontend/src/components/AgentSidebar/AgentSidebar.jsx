@@ -53,20 +53,53 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
   const [sessionListExpanded, setSessionListExpanded] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
   const lastAutoOpenedRef = useRef(-1);
+  const userScrolledUpRef = useRef(false);
+  const initialScrollDoneRef = useRef(false);
 
-  // 自动滚动
+  // 检测用户是否主动向上滚动
+  const handleChatScroll = useCallback(() => {
+    const el = chatContainerRef.current;
+    if (!el) return;
+    // 距底部超过 80px 视为用户主动上翻
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    userScrolledUpRef.current = distanceFromBottom > 80;
+  }, []);
+
+  // 历史消息加载后，立即滚动到底部（无动画，避免闪烁）
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!initialScrollDoneRef.current && conversations.length > 0 && !loading) {
+      initialScrollDoneRef.current = true;
+      // 延迟一帧，确保 DOM 已渲染
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      });
+    }
+  }, [conversations, loading]);
+
+  // 智能自动滚动：仅在用户未上翻时才滚动到底部
+  useEffect(() => {
+    if (!initialScrollDoneRef.current) return; // 初始滚动未完成时跳过
+    if (!userScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [conversations, streamState.answer, streamState.diff, streamState.processMessages]);
+
+  // 发送新消息时强制恢复自动滚动
+  const resetAutoScroll = useCallback(() => {
+    userScrolledUpRef.current = false;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   // 发送
   const handleSend = useCallback(() => {
     if (!userInput.trim() || loading) return;
     const text = userInput.trim();
     setUserInput('');
+    resetAutoScroll();
     sendMessage(text, noteContent, activeNote?.title || null);
-  }, [userInput, loading, setUserInput, sendMessage, noteContent, activeNote]);
+  }, [userInput, loading, setUserInput, sendMessage, noteContent, activeNote, resetAutoScroll]);
 
   // 在主区域打开双栏对比标签页
   const handleOpenDiffInMain = useCallback((index) => {
@@ -402,7 +435,10 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
             </div>
 
             {/* 对话区域 */}
-            <div style={{
+            <div
+              ref={chatContainerRef}
+              onScroll={handleChatScroll}
+              style={{
               flex: 1,
               overflow: 'auto',
               padding: '12px',

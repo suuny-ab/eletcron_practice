@@ -37,33 +37,6 @@ export function useUnifiedAgent() {
     streamStateRef.current = streamState;
   }, [streamState]);
 
-  // 监听会话切换事件
-  useEffect(() => {
-    const handleSessionSwitch = async (event) => {
-      const { sessionId: switchedId, isNew } = event.detail || {};
-      // 清空当前状态
-      setConversations([]);
-      setUserInput('');
-      setStreamState({ processMessages: [], answer: '', diff: '', sources: [] });
-      setPreviewMode(false);
-      setPendingDiff(null);
-      
-      // 如果正在生成，停止
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
-
-      // 切换到已有会话时，加载历史消息
-      if (!isNew && switchedId) {
-        await loadSessionHistory(switchedId);
-      }
-    };
-
-    window.addEventListener('session-switched', handleSessionSwitch);
-    return () => window.removeEventListener('session-switched', handleSessionSwitch);
-  }, []);
-
   // 从 API 加载会话历史并填充 conversations
   const loadSessionHistory = useCallback(async (targetSessionId) => {
     try {
@@ -89,6 +62,34 @@ export function useUnifiedAgent() {
       console.error('加载会话历史失败:', error);
     }
   }, []);
+
+  // sessionId 变化时：重置状态并加载历史
+  const prevSessionIdRef = useRef(sessionId);
+  useEffect(() => {
+    const prevId = prevSessionIdRef.current;
+    prevSessionIdRef.current = sessionId;
+
+    // 跳过首次渲染（由下面的 mount effect 处理）
+    if (prevId === sessionId) return;
+
+    // 中止正在进行的生成
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    // 清空状态
+    setConversations([]);
+    setUserInput('');
+    setStreamState({ processMessages: [], answer: '', diff: '', sources: [] });
+    setPreviewMode(false);
+    setPendingDiff(null);
+
+    // 加载历史（新创建的会话无需加载）
+    if (sessionId) {
+      loadSessionHistory(sessionId);
+    }
+  }, [sessionId, loadSessionHistory]);
 
   // 应用启动时加载当前会话的历史
   useEffect(() => {

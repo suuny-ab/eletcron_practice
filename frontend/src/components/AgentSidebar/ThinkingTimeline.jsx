@@ -9,6 +9,7 @@ import { COLORS } from '../../styles/tokens';
 // stage → 中文标签
 const STAGE_LABELS = {
   classifying: '意图分析',
+  checking_doc: '文档检查',
   analyzing: '问题分析',
   retrieving: '知识检索',
   evaluating: '结果评估',
@@ -58,7 +59,13 @@ function groupMessagesToSteps(messages, isStreaming) {
     if (msg.type === 'thinking') {
       // 独立 thinking（未跟在 status 后）
       if (steps.length > 0) {
-        steps[steps.length - 1].thinking = msg.content;
+        const lastStep = steps[steps.length - 1];
+        // 追加而非覆盖：如果上一步已有 thinking，则拼接
+        if (lastStep.thinking) {
+          lastStep.thinking += '\n' + msg.content;
+        } else {
+          lastStep.thinking = msg.content;
+        }
       } else {
         steps.push({
           id: `s${stepId++}`,

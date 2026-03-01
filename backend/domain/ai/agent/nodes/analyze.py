@@ -99,4 +99,20 @@ async def analyze_question(
         }
     except Exception as e:
         logger.error(f"[RAG Agent] 问题分析失败: {e}")
-        raise
+        fallback_analysis: AnalysisResult = {
+            "question_type": "knowledge_query",
+            "reasoning": f"分析异常: {e}",
+            "should_retrieve": True,
+            "key_entities": [],
+            "initial_query": question
+        }
+        output_messages.append({
+            "type": "thinking",
+            "content": "问题分析异常，默认进行知识检索",
+            "data": None
+        })
+        return {
+            "analysis": fallback_analysis,
+            "current_query": question,
+            "output_messages": state.get("output_messages", []) + output_messages
+        }

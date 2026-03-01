@@ -5,6 +5,7 @@ import { VerticalLeftOutlined, VerticalRightOutlined, SettingOutlined, BookOutli
 import KnowledgePage from './pages/Knowledge';
 import RAGDebugPage from './pages/RAGDebugPage';
 import MetricsPage from './pages/MetricsPage';
+import { SessionProvider } from './contexts/SessionContext';
 import { COLORS, SHADOWS, Z_INDEX, antThemeToken, antComponentTheme } from './styles/tokens';
 
 const { Title } = Typography;
@@ -28,6 +29,7 @@ function App() {
   };
 
   return (
+    <SessionProvider>
     <ConfigProvider
       locale={zhCN}
       theme={{
@@ -152,6 +154,7 @@ function App() {
         `}</style>
       </Layout>
     </ConfigProvider>
+    </SessionProvider>
   );
 }
 

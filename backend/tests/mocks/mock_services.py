@@ -32,9 +32,6 @@ class MockLLMTaskService(ILLMTaskService):
     async def stream(
         self,
         task_type: str,
-        *,
-        session_id: str | None = None,
-        use_history: bool = False,
         **kwargs
     ) -> AsyncGenerator[str, None]:
         # 返回固定的测试输出

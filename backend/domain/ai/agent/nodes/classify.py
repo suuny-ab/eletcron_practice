@@ -105,4 +105,16 @@ async def classify_intent(
         }
     except Exception as e:
         logger.error(f"[Unified Agent] 意图分类失败: {e}")
-        raise
+        has_doc = bool(state.get("document_content"))
+        fallback_intent = "doc_advise" if has_doc else "chitchat"
+        output_messages.append({
+            "type": "thinking",
+            "content": f"意图分类异常，降级为 {fallback_intent}",
+            "data": None
+        })
+        return {
+            "intent_type": fallback_intent,
+            "needs_rag": False,
+            "needs_doc": has_doc,
+            "output_messages": state.get("output_messages", []) + output_messages
+        }

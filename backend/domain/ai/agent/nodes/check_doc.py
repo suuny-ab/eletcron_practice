@@ -35,6 +35,13 @@ async def check_document(
             "output_messages": state.get("output_messages", []) + output_messages
         }
     
+    # 发送状态消息
+    output_messages.append({
+        "type": "status",
+        "content": "正在检查文档...",
+        "data": {"stage": "checking_doc"}
+    })
+
     # 检查文档是否存在
     has_document = bool(document_content and document_content.strip())
     

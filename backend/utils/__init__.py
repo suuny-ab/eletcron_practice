@@ -3,7 +3,7 @@
 """
 from .stream_utils import create_json_stream, create_streaming_response, STREAM_HEADERS
 from .string_utils import mask_api_key
-from .validation import require_param, validate_service
+from .validation import require_param, validate_service, validate_session_id
 
 __all__ = [
     "create_json_stream",
@@ -12,4 +12,5 @@ __all__ = [
     "mask_api_key",
     "require_param",
     "validate_service",
+    "validate_session_id",
 ]

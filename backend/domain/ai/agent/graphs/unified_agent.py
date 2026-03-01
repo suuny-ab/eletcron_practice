@@ -2,6 +2,7 @@
 统一 Agent 图定义
 基于 LangGraph 构建的统一工作流
 """
+import time
 from collections.abc import AsyncGenerator
 from typing import Literal
 
@@ -31,8 +32,10 @@ from ..nodes import (
 )
 from ...memory import UnifiedMemoryManager, UnifiedSummarizer, SessionMetadataManager
 from infrastructure.logging.logger import get_logger
+from infrastructure.metrics import get_metrics
 
 logger = get_logger(__name__)
+metrics = get_metrics()
 
 
 class UnifiedAgent:
@@ -147,35 +150,45 @@ class UnifiedAgent:
     # ===== 节点包装器 =====
 
     async def _run_load_history(self, state: UnifiedAgentState) -> dict:
-        memory = self._create_memory_manager(state.get("session_id", ""))
-        return await load_history(state, memory)
+        with metrics.timer("agent.node.load_history.duration_seconds"):
+            memory = self._create_memory_manager(state.get("session_id", ""))
+            return await load_history(state, memory)
 
     async def _run_classify(self, state: UnifiedAgentState) -> dict:
-        return await classify_intent(state, self._chat_model)
+        with metrics.timer("agent.node.classify.duration_seconds"):
+            return await classify_intent(state, self._chat_model)
 
     async def _run_check_doc(self, state: UnifiedAgentState) -> dict:
-        return await check_document(state)
+        with metrics.timer("agent.node.check_doc.duration_seconds"):
+            return await check_document(state)
 
     async def _run_prompt_doc(self, state: UnifiedAgentState) -> dict:
-        return await prompt_document(state)
+        with metrics.timer("agent.node.prompt_doc.duration_seconds"):
+            return await prompt_document(state)
 
     async def _run_analyze(self, state: UnifiedAgentState) -> dict:
-        return await analyze_question(state, self._chat_model)
+        with metrics.timer("agent.node.analyze.duration_seconds"):
+            return await analyze_question(state, self._chat_model)
 
     async def _run_retrieve(self, state: UnifiedAgentState) -> dict:
-        return await execute_retrieval(state, self._retrieval_service)
+        with metrics.timer("agent.node.retrieve.duration_seconds"):
+            return await execute_retrieval(state, self._retrieval_service)
 
     async def _run_evaluate(self, state: UnifiedAgentState) -> dict:
-        return await evaluate_results(state, self._chat_model)
+        with metrics.timer("agent.node.evaluate.duration_seconds"):
+            return await evaluate_results(state, self._chat_model)
 
     async def _run_rewrite(self, state: UnifiedAgentState) -> dict:
-        return await rewrite_query(state, self._chat_model)
+        with metrics.timer("agent.node.rewrite.duration_seconds"):
+            return await rewrite_query(state, self._chat_model)
 
     async def _run_check_permission(self, state: UnifiedAgentState) -> dict:
-        return await check_permission(state)
+        with metrics.timer("agent.node.check_permission.duration_seconds"):
+            return await check_permission(state)
 
     async def _run_suggest_mode(self, state: UnifiedAgentState) -> dict:
-        return await suggest_mode_switch(state)
+        with metrics.timer("agent.node.suggest_mode.duration_seconds"):
+            return await suggest_mode_switch(state)
 
     # ===== 路由函数 =====
 
@@ -287,6 +300,8 @@ class UnifiedAgent:
             f"mode={permission_mode}, doc={document_name or '无'}"
         )
 
+        _wf_start = time.perf_counter()
+
         try:
             # === 阶段 1: 执行图（状态转换）===
             final_state = initial_state.copy()
@@ -304,6 +319,8 @@ class UnifiedAgent:
             if final_state.get("should_end"):
                 end_reason = final_state.get("end_reason", "")
                 logger.info(f"[Unified Agent] 提前结束: {end_reason}")
+                metrics.increment("agent.workflow.count")
+                metrics.observe("agent.workflow.duration_seconds", time.perf_counter() - _wf_start)
                 yield {
                     "type": "complete",
                     "content": None,
@@ -315,6 +332,7 @@ class UnifiedAgent:
 
             # === 阶段 3: 流式生成输出 ===
             intent_type = final_state.get("intent_type", "chitchat")
+            metrics.increment(f"agent.intent.{intent_type}.count")
             output_chunks: list[str] = []
 
             if intent_type == "chitchat":
@@ -351,7 +369,10 @@ class UnifiedAgent:
             final_state["final_output"] = "".join(output_chunks)
             await self._save_history(final_state)
 
-            # === 阶段 5: 发送完成消息 ===
+            # === 阶段 5: 记录工作流指标并发送完成消息 ===
+            metrics.increment("agent.workflow.count")
+            metrics.observe("agent.workflow.duration_seconds", time.perf_counter() - _wf_start)
+
             yield {
                 "type": "complete",
                 "content": None,
@@ -369,6 +390,8 @@ class UnifiedAgent:
             )
 
         except Exception as e:
+            metrics.increment("agent.workflow.error.count")
+            metrics.observe("agent.workflow.duration_seconds", time.perf_counter() - _wf_start)
             logger.error(f"[Unified Agent] 执行失败: {e}")
             yield {
                 "type": "error",

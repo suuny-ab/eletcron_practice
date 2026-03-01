@@ -10,9 +10,13 @@ from typing import Awaitable, Callable
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
 
+from paths import SESSIONS_DIR
+from infrastructure.metrics import get_metrics
 from .models import ConversationTurn, HistorySummary
 
 SUMMARY_PREFIX = "历史摘要：\n"
+
+metrics = get_metrics()
 
 
 class UnifiedMemoryManager:
@@ -43,8 +47,7 @@ class UnifiedMemoryManager:
             summarizer: 摘要生成函数
         """
         self.session_id = session_id
-        backend_dir = Path(__file__).resolve().parents[3]
-        self.base_dir = base_dir or (backend_dir / ".data" / "ai_sessions")
+        self.base_dir = base_dir or SESSIONS_DIR
         self.base_dir.mkdir(parents=True, exist_ok=True)
         
         # 按 session_id 隔离历史文件
@@ -60,6 +63,7 @@ class UnifiedMemoryManager:
         Returns:
             (摘要, 近期轮次列表)
         """
+        metrics.increment("memory.history.load.count")
         return self._load()
     
     async def add_turn(self, turn: ConversationTurn) -> None:
@@ -70,6 +74,7 @@ class UnifiedMemoryManager:
         Args:
             turn: 新的对话轮次
         """
+        metrics.increment("memory.turn.add.count")
         summary, turns = self._load()
         turns.append(turn)
         
@@ -184,10 +189,12 @@ class UnifiedMemoryManager:
         return summary, turns
     
     def _save(self, summary: HistorySummary | None, turns: list[ConversationTurn]) -> None:
-        """保存历史到文件"""
+        """保存历史到文件（原子写入）"""
         self.history_file.parent.mkdir(parents=True, exist_ok=True)
         
-        with open(self.history_file, "w", encoding="utf-8") as f:
+        # 原子写入：先写临时文件，再重命名
+        temp_file = self.history_file.with_suffix(".tmp")
+        with open(temp_file, "w", encoding="utf-8") as f:
             # 先写摘要
             if summary:
                 f.write(json.dumps(summary.to_dict(), ensure_ascii=False) + "\n")
@@ -195,6 +202,7 @@ class UnifiedMemoryManager:
             # 再写轮次
             for turn in turns:
                 f.write(json.dumps(turn.to_dict(), ensure_ascii=False) + "\n")
+        temp_file.replace(self.history_file)
     
     async def _rollup_summary(
         self,
@@ -213,6 +221,8 @@ class UnifiedMemoryManager:
             
             if not old_turns:
                 break
+            
+            metrics.increment("memory.summary.rollup.count")
             
             # 提取涉及的主题/文档
             topics = set()

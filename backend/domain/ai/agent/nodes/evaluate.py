@@ -130,4 +130,14 @@ async def evaluate_results(
         }
     except Exception as e:
         logger.error(f"[RAG Agent] 评估失败: {e}")
-        raise
+        fallback_evaluation: EvaluationResult = {
+            "is_sufficient": True,
+            "confidence": 0.3,
+            "reasoning": f"评估异常: {e}",
+            "missing_aspects": [],
+            "suggestion": "proceed"
+        }
+        return {
+            "evaluation": fallback_evaluation,
+            "output_messages": state.get("output_messages", []) + output_messages
+        }

@@ -250,7 +250,28 @@ def _on_file_changed(self, file_path: str, event_type: str):
         self._index_single_file(file_path, relative_path)
 ```
 
-### 3. 停止信号机制
+### 3. 索引标记同步机制
+
+**问题背景**：增量索引（文件新增/修改/删除）会改变向量库中的实际文档数量，但如果不同步更新 `index_marker.json` 中的 `chunk_count`，会导致系统重启时检测到"数据不一致"，误触发全量重建。
+
+**解决方案**：`_sync_marker_to_actual()` 方法
+
+```python
+def _sync_marker_to_actual(self):
+    """将 index_marker 同步为向量库的实际数据量"""
+    actual_count = self._vectorstore._collection.count()
+    marker = self._load_index_marker()
+    file_count = marker.get("file_count", 0) if marker else 0
+    self._write_index_marker(file_count=file_count, chunk_count=actual_count)
+```
+
+**调用时机**：
+1. `_index_single_file()` 完成后 — 增量索引会增加 chunk_count
+2. `_remove_file_documents()` 完成后 — 文件删除会减少 chunk_count
+
+**效果**：确保 `index_marker.json` 始终反映向量库的真实状态，避免不必要的全量重建。
+
+### 4. 停止信号机制
 
 支持优雅中断长时间索引任务：
 
@@ -316,6 +337,23 @@ logger.info(
     )}
 )
 ```
+
+### 3. 数据一致性校验
+
+系统启动时执行索引标记验证（`_should_skip_full_index`），确保索引数据完整性：
+
+1. 读取 `index_marker.json` 中的 `chunk_count`
+2. 查询向量库实际文档数 `vectorstore.count()`
+3. 两者不一致时，删除 marker 并触发全量重建
+
+```
+# 日志示例
+[RAG] 向量库数据量不一致 (期望:862, 实际:863)，重新索引
+[RAG] 已清理向量库旧数据 (863 条)
+[RAG] 全量索引完成，共添加 863 个文档块
+```
+
+配合增量索引的 `_sync_marker_to_actual()` 机制，可有效避免因增量操作导致的误判重建。
 
 ## 技术选型理由
 

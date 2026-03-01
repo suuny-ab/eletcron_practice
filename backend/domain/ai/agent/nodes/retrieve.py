@@ -76,4 +76,13 @@ async def execute_retrieval(
         
     except Exception as e:
         logger.error(f"[RAG Agent] 检索失败: {e}")
-        raise
+        output_messages.append({
+            "type": "thinking",
+            "content": f"检索异常: {e}，将使用已有结果继续",
+            "data": None
+        })
+        return {
+            "current_round": current_round,
+            "all_sources": all_sources,
+            "output_messages": state.get("output_messages", []) + output_messages
+        }

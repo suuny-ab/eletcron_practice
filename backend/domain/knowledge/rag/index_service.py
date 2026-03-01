@@ -342,10 +342,21 @@ class IndexService:
 
             if event_type == "deleted":
                 self._remove_file_documents(relative_path)
+                self._sync_marker_to_actual()
             else:
                 self._index_single_file(file_path, relative_path)
         except Exception as e:
             logger.error(f"[RAG] 文件变化处理失败: {e}")
+
+    def _sync_marker_to_actual(self):
+        """将 index marker 同步为向量库的实际数据量"""
+        try:
+            actual_count = self._vectorstore._collection.count()
+            marker = self._load_index_marker()
+            file_count = marker.get("file_count", 0) if marker else 0
+            self._write_index_marker(file_count=file_count, chunk_count=actual_count)
+        except Exception as e:
+            logger.warning(f"[RAG] 同步 marker 失败: {e}")
 
     def _index_single_file(self, file_path: str, relative_path: str):
         """索引单个文件"""
@@ -364,6 +375,9 @@ class IndexService:
                 logger.warning(f"[RAG] 文件无内容可索引: {relative_path}")
 
             self._bm25_index.update_file(relative_path, chunks)
+
+            # 增量索引后同步 marker，避免重启时误判为数据不一致
+            self._sync_marker_to_actual()
         except Exception as e:
             logger.error(f"[RAG] 文件索引失败 {relative_path}: {e}")
 

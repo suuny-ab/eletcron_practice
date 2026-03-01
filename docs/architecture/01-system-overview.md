@@ -31,6 +31,10 @@ AI 知识库助手是一个基于 Electron + React + FastAPI 的桌面应用，�
 │  │  │ 文件树   │  │ 笔记编辑 │  │ AI 侧边栏│  │ 配置页面 │     │  │
 │  │  │ FileTree │  │ Editor   │  │ AISidebar│  │ Config   │     │  │
 │  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘     │  │
+│  │  ┌──────────┐  ┌────────────────┐                            │  │
+│  │  │ 指标监控 │  │ 时序图表       │                            │  │
+│  │  │ Metrics  │  │ TimeSeriesChart│                            │  │
+│  │  └──────────┘  └────────────────┘                            │  │
 │  │                                                               │  │
 │  │  ┌─────────────────────────────────────────────────────┐     │  │
 │  │  │               自定义 Hooks                           │     │  │
@@ -39,7 +43,7 @@ AI 知识库助手是一个基于 Electron + React + FastAPI 的桌面应用，�
 │  │                                                               │  │
 │  │  ┌─────────────────────────────────────────────────────┐     │  │
 │  │  │               API 调用层                             │     │  │
-│  │  │  knowledge.js | ai.js | config.js                   │     │  │
+│  │  │  knowledge.js | ai.js | config.js | metrics.js      │     │  │
 │  │  └─────────────────────────────────────────────────────┘     │  │
 │  └──────────────────────────────────────────────────────────────┘  │
 │                              │                                      │
@@ -57,6 +61,11 @@ AI 知识库助手是一个基于 Electron + React + FastAPI 的桌面应用，�
 │  │  │  │          │  │Routes    │  │Routes    │          │     │  │
 │  │  │  └────┬─────┘  └────┬─────┘  └────┬─────┘          │     │  │
 │  │  │       │             │             │                 │     │  │
+│  │  │  ┌──────────┐  ┌──────────────────────────┐        │     │  │
+│  │  │  │Health    │  │ MetricsMiddleware         │        │     │  │
+│  │  │  │Routes    │  │ (HTTP 请求指标采集)       │        │     │  │
+│  │  │  └────┬─────┘  └──────────────────────────┘        │     │  │
+│  │  │       │             │             │                 │     │  │
 │  │  │  ┌────┴─────────────┴─────────────┴────┐           │     │  │
 │  │  │  │         Services (服务层)            │           │     │  │
 │  │  │  │  AIService | KnowledgeService        │           │     │  │
@@ -72,7 +81,9 @@ AI 知识库助手是一个基于 Electron + React + FastAPI 的桌面应用，�
 │  │  │  │ - ModelProvider  │  │ - RAGService     │         │     │  │
 │  │  │  │ - ChatModel      │  │ - IndexService   │         │     │  │
 │  │  │  │ - LLMTaskService │  │ - RetrievalSvc   │         │     │  │
-│  │  │  │ - PromptFactory  │  │ - BM25Index      │         │     │  │
+│  │  │  │ - UnifiedAgent   │  │ - BM25Index      │         │     │  │
+│  │  │  │ - UnifiedMemory  │  │                  │         │     │  │
+│  │  │  │ - PromptFactory  │  │                  │         │     │  │
 │  │  │  └──────────────────┘  └──────────────────┘         │     │  │
 │  │  └─────────────────────────────────────────────────────┘     │  │
 │  │                                                               │  │
@@ -115,7 +126,14 @@ app/
 ├── api/routes/          # API 路由
 │   ├── ai_routes.py     # AI 功能路由
 │   ├── knowledge_routes.py  # 知识库路由
-│   └── config_routes.py # 配置路由
+│   ├── config_routes.py # 配置路由
+│   └── health_routes.py # 健康检查与监控路由
+│       # GET /health           - 基础健康检查
+│       # GET /health/detail    - 详细服务状态
+│       # GET /health/metrics   - 实时指标快照
+│       # GET /health/timeseries - 时序数据 (1-60分钟)
+├── middleware/           # 请求中间件
+│   └── metrics_middleware.py  # HTTP 请求指标采集
 ├── services/            # 应用服务
 │   ├── ai_service.py    # AI 服务编排
 │   └── cleanup_service.py   # 会话清理
@@ -135,10 +153,23 @@ domain/
 │   ├── models/          # 模型管理
 │   │   ├── model_provider.py
 │   │   └── chat_model_service.py
+│   ├── agent/           # Agent 工作流（LangGraph 状态机）
+│   │   ├── graphs/
+│   │   │   └── unified_agent.py   # 统一 Agent 图（含节点级指标）
+│   │   ├── nodes/       # 工作流节点（15 个节点实现）
+│   │   └── state.py     # Agent 状态定义
+│   ├── memory/          # 会话记忆
+│   │   ├── unified_memory.py          # 统一记忆管理（JSONL + 摘要滚动）
+│   │   └── session_metadata_manager.py # 会话元数据
 │   ├── template/        # 提示词模板
 │   │   └── config.py
 │   └── services/
 │       └── llm_task_service.py
+```
+
+> Agent 工作流支持 5 种意图（chitchat/rag_query/doc_advise/doc_edit/doc_format），
+> 通过条件路由实现 RAG 检索循环、文档检查、权限校验等流程。
+> 详细设计参见 [04-agent-workflow.md](04-agent-workflow.md)
 │
 └── knowledge/           # 知识库领域
     ├── rag/             # RAG 模块
@@ -165,8 +196,8 @@ infrastructure/
 ├── storage/             # 存储服务
 │   ├── document_processor.py
 │   └── file_watcher.py
-└── metrics/             # 指标收集
-    └── collector.py
+└── metrics/             # 指标收集与监控
+    └── collector.py     # MetricsCollector（计数器/直方图/时序缓冲/JSONL 持久化）
 ```
 
 ### 4. Core Layer (核心层)
@@ -267,6 +298,31 @@ class IKnowledgeRepository(ABC):
     def get_file_tree(self) -> list[FileTreeNode]: ...
 ```
 
+### 6. 可观测性 - 指标收集与监控
+
+系统内置了完整的指标监控体系，通过 `MetricsCollector` 全局单例进行多层级指标采集：
+
+**指标类型**：
+- **Counter**：计数器（请求数、错误数、调用次数）
+- **Histogram**：直方图（耗时分布，含 min/max/avg）
+- **TimeSeries**：时序数据（环形缓冲区，10s 快照间隔）
+
+**采集层级**：
+
+| 层级 | 组件 | 典型指标 |
+|------|------|---------|
+| HTTP | MetricsMiddleware | http.requests.count, http.requests.duration_seconds |
+| LLM | LLMTaskService | llm.call.duration_seconds, llm.calls |
+| Agent | UnifiedAgent | agent.workflow.duration_seconds, agent.node.*.duration_seconds |
+| RAG | IndexService / RetrievalService | rag.index.duration_seconds, rag.retrieval.queries |
+| Memory | UnifiedMemory / SessionMetadataManager | memory.turn.add.count, session.create.count |
+
+**持久化**：JSONL 格式存储到 `.data/metrics.jsonl`，支持 7 天数据保留和启动时恢复。
+
+**前端可视化**：MetricsDashboard 提供 4 类时序趋势图（HTTP/LLM/RAG/Agent）、指标卡片和时间窗口选择（5/15/30/60 分钟）。
+
+> 详细设计参见 [03-metrics-monitoring.md](03-metrics-monitoring.md)
+
 ## 流式响应架构
 
 ```
@@ -363,11 +419,16 @@ frontend/src/
 ├── api/                 # API 调用
 │   ├── ai.js
 │   ├── knowledge.js
-│   └── config.js
+│   ├── config.js
+│   └── metrics.js       # 监控指标 API（健康检查/实时指标/时序数据）
 ├── components/          # 可复用组件
 │   ├── FileTree/
 │   ├── NoteEditor/
-│   ├── AISidebar/
+│   ├── AISidebar/       # AI 侧边栏（含智能滚动检测）
+│   ├── Metrics/         # 监控组件
+│   │   └── TimeSeriesChart.jsx  # 通用时序图表（recharts）
+│   ├── RAGDebug/
+│   │   └── MetricsDashboard.jsx # 指标监控仪表盘
 │   └── common/
 ├── hooks/               # 自定义 Hooks
 │   ├── useFileTree.js
@@ -375,7 +436,8 @@ frontend/src/
 │   └── useRAG.js
 ├── pages/               # 页面组件
 │   ├── Knowledge.jsx
-│   └── Config.jsx
+│   ├── Config.jsx
+│   └── MetricsPage.jsx  # 全屏指标监控页面
 └── utils/               # 工具函数
 ```
 

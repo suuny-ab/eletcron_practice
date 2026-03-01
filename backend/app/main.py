@@ -180,6 +180,10 @@ def _register_config_listeners(app: FastAPI):
     app.state.config_context.register_listener(init_rag_service, name="init_rag_service")
 
 
+# 注册中间件
+from .middleware import MetricsMiddleware
+app.add_middleware(MetricsMiddleware)
+
 # 注册路由
 app.include_router(health_router, prefix="/api")
 app.include_router(ai_router, prefix="/api")

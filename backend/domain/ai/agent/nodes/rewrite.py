@@ -100,4 +100,7 @@ async def rewrite_query(
         }
     except Exception as e:
         logger.error(f"[RAG Agent] 查询重构失败: {e}")
-        raise
+        return {
+            "current_query": question,
+            "output_messages": state.get("output_messages", []) + output_messages
+        }

@@ -9,7 +9,7 @@ from app.schemas import (
     RAGRequest, UnifiedAgentRequest, DataResponse, RAGDebugInfo,
     SessionRenameRequest, SessionMetadataResponse, BaseResponse,
 )
-from utils import create_streaming_response, require_param, validate_service
+from utils import create_streaming_response, require_param, validate_service, validate_session_id
 from domain.ai.memory import SessionMetadataManager, UnifiedMemoryManager
 
 
@@ -71,6 +71,7 @@ async def get_session(
     Returns:
         会话元数据
     """
+    session_id = validate_session_id(session_id)
     session = manager.get_session(session_id)
     
     if not session:
@@ -106,10 +107,9 @@ async def delete_session(
     Returns:
         操作结果
     """
-    if not manager.session_exists(session_id):
+    session_id = validate_session_id(session_id)
+    if not manager.delete_session(session_id):
         raise HTTPException(status_code=404, detail=f"会话不存在: {session_id}")
-    
-    manager.delete_session(session_id)
     
     return BaseResponse(message="会话已删除")
 
@@ -130,6 +130,7 @@ async def rename_session(
     Returns:
         操作结果
     """
+    session_id = validate_session_id(session_id)
     title = request.title.strip()
     
     if not title:
@@ -159,6 +160,7 @@ async def get_session_history(session_id: str):
     Returns:
         对话轮次列表
     """
+    session_id = validate_session_id(session_id)
     memory = UnifiedMemoryManager(session_id=session_id)
     summary, turns = memory.get_history_sync()
     

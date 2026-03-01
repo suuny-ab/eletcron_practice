@@ -48,6 +48,12 @@ class MetricsResponse(BaseModel):
     histograms: dict
 
 
+class TimeSeriesResponse(BaseModel):
+    """时序数据响应"""
+    interval_seconds: int = 10
+    data_points: list[dict]
+
+
 @router.get("", response_model=HealthStatus)
 async def health_check():
     """
@@ -132,11 +138,19 @@ async def detailed_health_check(request: Request):
     # 3. AI 服务
     ai_status = "not_configured"
     ai_details = {}
-    if hasattr(request.app.state, "ai_service"):
-        ai_status = "healthy"
-        # 可以添加更多 AI 服务状态检查
-    else:
-        ai_details["warning"] = "服务未初始化"
+    try:
+        from core.container import get_container
+        from core.interfaces import IModelProvider
+        container = get_container()
+        provider = container.resolve(IModelProvider)
+        if provider is not None:
+            ai_status = "healthy"
+            ai_details["model"] = getattr(provider, "model_name", "unknown")
+        else:
+            ai_details["warning"] = "模型提供者未配置"
+            ai_status = "degraded"
+    except Exception:
+        ai_details["warning"] = "API Key 未配置"
         ai_status = "degraded"
 
     services.append(ServiceStatus(
@@ -181,4 +195,25 @@ async def get_metrics_endpoint():
         uptime_seconds=snapshot["uptime_seconds"],
         counters=snapshot["counters"],
         histograms=snapshot["histograms"],
+    )
+
+
+@router.get("/timeseries", response_model=TimeSeriesResponse)
+async def get_timeseries_endpoint(minutes: int = 60):
+    """
+    获取时序指标数据
+
+    Args:
+        minutes: 返回最近 N 分钟的数据（默认 60，最大 60）
+
+    Returns:
+        时序数据点列表
+    """
+    minutes = max(1, min(minutes, 60))
+    metrics = get_metrics()
+    data_points = metrics.get_timeseries(minutes=minutes)
+
+    return TimeSeriesResponse(
+        interval_seconds=10,
+        data_points=data_points,
     )
