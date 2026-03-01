@@ -1,104 +1,16 @@
 """
 AI相关路由
-处理AI对话和排版优化等操作
+处理统一 Agent 和 RAG 调试接口
 """
 from fastapi import APIRouter, Depends
 
-from app.services import AIService
-from app.dependencies import get_ai_service, get_rag_service, get_chat_model_service, get_llm_task_service
-from app.schemas import ChatRequest, OptimizeRequest, EditRequest, RAGRequest, RAGAgentRequest, UnifiedAgentRequest, DataResponse, RAGDebugInfo
+from app.dependencies import get_rag_service, get_chat_model_service, get_llm_task_service
+from app.schemas import RAGRequest, UnifiedAgentRequest, DataResponse, RAGDebugInfo
 from utils import create_streaming_response, require_param, validate_service
 
 
 # 创建路由器
 router = APIRouter(prefix="/ai", tags=["AI"])
-
-
-@router.post("/optimize")
-async def optimize_layout(
-    request: OptimizeRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
-    """
-    对已上传的文件进行排版优化，流式返回结果
-
-    路由层职责：
-    1. 校验请求数据（Pydantic自动验证）
-    2. 调用工具层包装服务层输出
-    3. 返回StreamingResponse
-    """
-    filename = require_param(request.filename, "filename")
-
-    return create_streaming_response(
-        ai_service.optimize_markdown_layout_stream,
-        filename
-    )
-
-
-@router.post("/advise")
-async def advise_document(
-    request: ChatRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
-    """
-    接受用户问题和文件内容，返回 AI 建议
-
-    路由层职责：
-    1. 校验请求数据（Pydantic自动验证）
-    2. 调用工具层包装服务层输出
-    3. 返回StreamingResponse
-    """
-    filename = require_param(request.filename, "filename")
-    question = require_param(request.question, "question")
-
-    return create_streaming_response(
-        ai_service.chat_suggestion_stream,
-        filename,
-        question
-    )
-
-
-@router.post("/edit")
-async def edit_document(
-    request: EditRequest,
-    ai_service: AIService = Depends(get_ai_service)
-):
-    """
-    对已上传的文件进行编辑，流式返回结果
-
-    路由层职责：
-    1. 校验请求数据（Pydantic自动验证）
-    2. 调用工具层包装服务层输出
-    3. 返回StreamingResponse
-    """
-    filename = require_param(request.filename, "filename")
-    requirement = require_param(request.requirement, "requirement")
-
-    return create_streaming_response(
-        ai_service.edit_document_stream,
-        filename,
-        requirement
-    )
-
-
-@router.post("/rag")
-async def rag_answer(
-    request: RAGRequest,
-    ai_service: AIService = Depends(get_ai_service),
-    rag_service = Depends(get_rag_service)
-):
-    """
-    知识库问答接口（RAG 检索 + AI 问答）
-    """
-    question = require_param(request.question, "question")
-    validate_service(rag_service, "RAG")
-
-    return create_streaming_response(
-        ai_service.rag_answer_stream,
-        rag_service,
-        question,
-        request.top_k
-    )
 
 
 @router.post("/rag/debug", response_model=DataResponse[RAGDebugInfo])
@@ -124,36 +36,6 @@ async def rag_debug(
     return DataResponse(
         data=RAGDebugInfo(**debug_info),
         message="RAG 调试信息获取成功"
-    )
-
-
-@router.post("/rag/agent")
-async def rag_agent(
-    request: RAGAgentRequest,
-    rag_service = Depends(get_rag_service),
-    chat_model_service = Depends(get_chat_model_service),
-    llm_task_service = Depends(get_llm_task_service),
-):
-    """
-    RAG Agent 智能问答接口（已废弃，请使用 /api/ai/agent）
-    """
-    question = require_param(request.question, "question")
-    validate_service(rag_service, "RAG")
-    
-    from domain.ai.agent import RAGAgent
-    
-    agent = RAGAgent(
-        chat_model=chat_model_service.chat_model,
-        retrieval_service=rag_service._retrieval_service,
-        llm_task_service=llm_task_service,
-    )
-    
-    return create_streaming_response(
-        agent.astream,
-        question=question,
-        top_k=request.top_k,
-        max_rounds=request.max_rounds,
-        note_context=request.note_context,
     )
 
 

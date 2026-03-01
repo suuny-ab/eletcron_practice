@@ -1,6 +1,6 @@
 """
-RAG Agent 图定义模块
+Agent 图定义模块
 """
-from .rag_agent import RAGAgent
+from .unified_agent import UnifiedAgent
 
-__all__ = ["RAGAgent"]
+__all__ = ["UnifiedAgent"]

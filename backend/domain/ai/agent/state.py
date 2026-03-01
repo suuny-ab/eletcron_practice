@@ -95,6 +95,3 @@ class UnifiedAgentState(TypedDict, total=False):
     end_reason: str                      # 结束原因: prompt_doc / suggest_mode / error
     error: str                           # 错误信息
 
-
-# ===== 兼容性别名（旧代码可继续使用）=====
-RAGAgentState = UnifiedAgentState

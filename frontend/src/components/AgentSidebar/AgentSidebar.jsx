@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import { remarkPlugins, rehypePlugins, createMarkdownComponents } from '../../utils/markdownStyles.jsx';
-import { SourceList } from '../AISidebar/SourceCard';
+import { SourceList } from './SourceCard';
 import { useUnifiedAgent } from '../../hooks/useUnifiedAgent';
 import { COLORS } from '../../styles/tokens';
 

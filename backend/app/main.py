@@ -21,9 +21,6 @@ from infrastructure.config.config_context import ConfigModel
 # 导入模型提供者（具体实现）
 from domain.ai.models.model_provider import ModelProvider
 
-# 导入 AI 服务
-from .services.ai_service import AIService
-
 
 # 导入清理服务
 from .services.cleanup_service import SessionCleanupService
@@ -163,16 +160,7 @@ def _register_config_listeners(app: FastAPI):
     
     app.state.config_context.register_listener(update_prompts, name="update_prompts")
     
-    # 监听器 3：更新 AI 服务
-    def update_ai_service(_config):
-        """更新 AI 服务"""
-        # 从容器获取最新的 AI 服务
-        app.state.ai_service = container.resolve(AIService)
-        return lambda: None
-    
-    app.state.config_context.register_listener(update_ai_service, name="update_ai_service")
-    
-    # 监听器 4：更新清理服务的笔记根目录
+    # 监听器 3：更新清理服务的笔记根目录
     def update_cleanup_notes_root(config):
         """更新清理服务的笔记根目录"""
         previous_notes_root = getattr(app.state.cleanup_service, "notes_root", None)
@@ -186,7 +174,7 @@ def _register_config_listeners(app: FastAPI):
     
     app.state.config_context.register_listener(update_cleanup_notes_root, name="update_cleanup_notes_root")
     
-    # 监听器 5：初始化 RAG 服务
+    # 监听器 4：初始化 RAG 服务
     def init_rag_service(config):
         """初始化 RAG 服务"""
         from domain.knowledge.rag.rag_service import RAGService

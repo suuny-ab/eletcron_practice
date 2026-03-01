@@ -14,7 +14,7 @@ from core.interfaces import (
     IKnowledgeRepository,
     IKnowledgeService,
 )
-from .services import AIService, SessionCleanupService
+from .services import SessionCleanupService
 
 if TYPE_CHECKING:
     from domain.knowledge.rag.rag_service import RAGService
@@ -52,11 +52,6 @@ def get_knowledge_service() -> IKnowledgeService:
     return get_container().resolve(IKnowledgeService)
 
 
-def get_ai_service() -> AIService:
-    """获取 AI 服务"""
-    return get_container().resolve(AIService)
-
-
 def get_session_cleanup_service() -> SessionCleanupService:
     """获取会话清理服务"""
     return get_container().resolve(SessionCleanupService)
@@ -65,7 +60,3 @@ def get_session_cleanup_service() -> SessionCleanupService:
 def get_rag_service(request: Request):
     """获取 RAG 服务"""
     return getattr(request.app.state, "rag_service", None)
-
-
-# 保持向后兼容
-ServiceFactory = None  # 标记为已弃用

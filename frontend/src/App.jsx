@@ -1,10 +1,9 @@
 import { useState } from 'react';
 import { ConfigProvider, Layout, Typography, Button, Space, Tooltip } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import { VerticalLeftOutlined, VerticalRightOutlined, SettingOutlined, BookOutlined, BugOutlined, DashboardOutlined, RobotOutlined } from '@ant-design/icons';
+import { VerticalLeftOutlined, VerticalRightOutlined, SettingOutlined, BookOutlined, BugOutlined, DashboardOutlined } from '@ant-design/icons';
 import KnowledgePage from './pages/Knowledge';
 import RAGDebugPage from './pages/RAGDebugPage';
-import RAGAgentPage from './pages/RAGAgentPage';
 import MetricsPage from './pages/MetricsPage';
 import { COLORS, SHADOWS, Z_INDEX, antThemeToken, antComponentTheme } from './styles/tokens';
 
@@ -15,7 +14,7 @@ function App() {
   const [aiSidebarVisible, setAiSidebarVisible] = useState(false);
   const [configTabVisible, setConfigTabVisible] = useState(false);
   const [configTabRequestId, setConfigTabRequestId] = useState(0);
-  const [currentPage, setCurrentPage] = useState('knowledge'); // 'knowledge' | 'debug' | 'agent' | 'metrics'
+  const [currentPage, setCurrentPage] = useState('knowledge'); // 'knowledge' | 'debug' | 'metrics'
 
   const handleOpenConfigTab = () => {
     setConfigTabVisible(true);
@@ -25,7 +24,6 @@ function App() {
   const pageTitle = {
     knowledge: '知识库',
     debug: 'RAG 调试',
-    agent: 'RAG Agent',
     metrics: '指标监控',
   };
 
@@ -77,13 +75,6 @@ function App() {
                 onClick={() => setCurrentPage('debug')}
               >
                 RAG 调试
-              </Button>
-              <Button
-                type={currentPage === 'agent' ? 'primary' : 'default'}
-                icon={<RobotOutlined />}
-                onClick={() => setCurrentPage('agent')}
-              >
-                RAG Agent
               </Button>
               <Button
                 type={currentPage === 'metrics' ? 'primary' : 'default'}
@@ -143,7 +134,6 @@ function App() {
               />
             )}
             {currentPage === 'debug' && <RAGDebugPage />}
-            {currentPage === 'agent' && <RAGAgentPage />}
             {currentPage === 'metrics' && <MetricsPage />}
           </div>
         </div>

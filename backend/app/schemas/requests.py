@@ -5,23 +5,6 @@ Pydantic 模型定义
 from pydantic import BaseModel
 
 
-class OptimizeRequest(BaseModel):
-    """AI 排版优化请求模型"""
-    filename: str
-
-
-class ChatRequest(BaseModel):
-    """AI 聊天请求模型"""
-    filename: str
-    question: str
-
-
-class EditRequest(BaseModel):
-    """AI 文档编辑请求模型"""
-    filename: str
-    requirement: str
-
-
 class SaveRequest(BaseModel):
     """保存文件请求模型"""
     filename: str
@@ -42,17 +25,9 @@ class FileUpdateRequest(BaseModel):
 
 
 class RAGRequest(BaseModel):
-    """RAG 问答请求模型"""
+    """RAG 调试请求模型"""
     question: str
     top_k: int = 3  # 返回的最相关文档数量
-
-
-class RAGAgentRequest(BaseModel):
-    """RAG Agent 请求模型（已废弃，使用 UnifiedAgentRequest）"""
-    question: str
-    top_k: int = 3  # 检索数量
-    max_rounds: int = 3  # 最大检索轮次
-    note_context: str | None = None  # 当前笔记上下文（可选）
 
 
 class UnifiedAgentRequest(BaseModel):
