@@ -43,7 +43,7 @@ class UnifiedMemoryManager:
             summarizer: 摘要生成函数
         """
         self.session_id = session_id
-        backend_dir = Path(__file__).resolve().parents[2]
+        backend_dir = Path(__file__).resolve().parents[3]
         self.base_dir = base_dir or (backend_dir / ".data" / "ai_sessions")
         self.base_dir.mkdir(parents=True, exist_ok=True)
         

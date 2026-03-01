@@ -143,3 +143,116 @@ export async function unifiedAgentStream(params, options = {}) {
 
   return response.body;
 }
+
+// ==================== 会话管理 API ====================
+
+/**
+ * 获取会话列表
+ * @param {string} sortBy - 排序字段 (created_at / updated_at)
+ * @returns {Promise<Array>} 会话列表
+ */
+export async function getSessions(sortBy = 'updated_at') {
+  const response = await fetch(`${API_BASE_URL}/api/ai/sessions?sort_by=${sortBy}`);
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || '获取会话列表失败');
+  }
+
+  return result.data;
+}
+
+/**
+ * 获取单个会话详情
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<Object>} 会话元数据
+ */
+export async function getSessionDetail(sessionId) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/sessions/${encodeURIComponent(sessionId)}`);
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || '获取会话详情失败');
+  }
+
+  return result.data;
+}
+
+/**
+ * 删除会话
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<void>}
+ */
+export async function deleteSession(sessionId) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || '删除会话失败');
+  }
+}
+
+/**
+ * 重命名会话
+ * @param {string} sessionId - 会话 ID
+ * @param {string} title - 新标题
+ * @returns {Promise<void>}
+ */
+export async function renameSession(sessionId, title) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/sessions/${encodeURIComponent(sessionId)}/rename`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ title }),
+  });
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || '重命名会话失败');
+  }
+}
+
+/**
+ * 获取会话对话历史
+ * @param {string} sessionId - 会话 ID
+ * @returns {Promise<Object>} { session_id, summary, messages: [{role, content, timestamp, ...}] }
+ */
+export async function getSessionHistory(sessionId) {
+  const response = await fetch(`${API_BASE_URL}/api/ai/sessions/${encodeURIComponent(sessionId)}/history`);
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
+  }
+
+  const result = await response.json();
+  if (!result.success) {
+    throw new Error(result.message || '获取会话历史失败');
+  }
+
+  return result.data;
+}

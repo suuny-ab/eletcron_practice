@@ -17,7 +17,6 @@ from domain.ai.services.chat_model import ChatModelService
 from domain.ai.services.llm_task_service import LLMTaskService
 from domain.knowledge.repositories.knowledge_repository import KnowledgeRepository
 from domain.knowledge.services.knowledge_service import KnowledgeService
-from .services import SessionCleanupService
 
 
 def configure_container(container: Container = None) -> Container:
@@ -45,9 +44,6 @@ def configure_container(container: Container = None) -> Container:
     # 知识库领域 - 单例
     container.register(IKnowledgeRepository, KnowledgeRepository, Lifetime.SINGLETON)
     container.register(IKnowledgeService, KnowledgeService, Lifetime.SINGLETON)
-
-    # 应用服务 - 单例
-    container.register(SessionCleanupService, SessionCleanupService, Lifetime.SINGLETON)
 
     return container
 

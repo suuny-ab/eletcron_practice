@@ -39,3 +39,8 @@ class UnifiedAgentRequest(BaseModel):
     document_name: str | None = None         # 文档名称（可选）
     top_k: int = 3                           # RAG 检索 fallback 数量（仅在 rerank 失败时使用）
     max_rounds: int = 3                      # RAG 最大检索轮次
+
+
+class SessionRenameRequest(BaseModel):
+    """会话重命名请求模型"""
+    title: str                               # 新标题，长度 1-50 字符

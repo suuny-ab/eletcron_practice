@@ -14,7 +14,6 @@ from core.interfaces import (
     IKnowledgeRepository,
     IKnowledgeService,
 )
-from .services import SessionCleanupService
 
 if TYPE_CHECKING:
     from domain.knowledge.rag.rag_service import RAGService
@@ -50,11 +49,6 @@ def get_knowledge_repository() -> IKnowledgeRepository:
 def get_knowledge_service() -> IKnowledgeService:
     """获取知识库服务"""
     return get_container().resolve(IKnowledgeService)
-
-
-def get_session_cleanup_service() -> SessionCleanupService:
-    """获取会话清理服务"""
-    return get_container().resolve(SessionCleanupService)
 
 
 def get_rag_service(request: Request):

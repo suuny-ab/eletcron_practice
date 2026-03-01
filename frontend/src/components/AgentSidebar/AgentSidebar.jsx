@@ -1,18 +1,22 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import {
-  Typography, Input, Button, Space, Tag, Collapse, Spin,
+  Typography, Input, Button, Space, Tag, Spin,
   Switch, Tooltip,
 } from 'antd';
 import {
-  SendOutlined, StopOutlined, RobotOutlined, SearchOutlined,
-  BulbOutlined, FileTextOutlined, CloseCircleOutlined,
-  PlusOutlined, LockOutlined, EditOutlined, InfoCircleOutlined,
-  DiffOutlined, CheckCircleOutlined,
+  SendOutlined, StopOutlined, RobotOutlined,
+  FileTextOutlined,
+  PlusOutlined, LockOutlined, EditOutlined,
+  DiffOutlined, CheckCircleOutlined, HistoryOutlined,
+  DownOutlined, UpOutlined,
 } from '@ant-design/icons';
 import ReactMarkdown from 'react-markdown';
 import { remarkPlugins, rehypePlugins, createMarkdownComponents } from '../../utils/markdownStyles.jsx';
 import { SourceList } from './SourceCard';
+import { SessionList } from './SessionList';
+import ThinkingTimeline from './ThinkingTimeline';
 import { useUnifiedAgent } from '../../hooks/useUnifiedAgent';
+import { useSession } from '../../hooks/useSession';
 import { COLORS } from '../../styles/tokens';
 
 const { Text, Paragraph } = Typography;
@@ -32,6 +36,21 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
     markDiffApplied,
     cancelDiffPreview,
   } = useUnifiedAgent();
+
+  // 会话列表管理
+  const {
+    sessionId,
+    sessionList,
+    sessionListLoading,
+    sessionListError,
+    loadSessions,
+    switchSession,
+    renameSession,
+    deleteSession,
+  } = useSession();
+
+  // 会话列表展开状态
+  const [sessionListExpanded, setSessionListExpanded] = useState(false);
 
   const messagesEndRef = useRef(null);
   const lastAutoOpenedRef = useRef(-1);
@@ -86,54 +105,6 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
     }
   }, [conversations, loading, handleOpenDiffInMain]);
 
-  // 渲染过程消息 tag
-  const renderProcessTag = (msg, index) => {
-    switch (msg.type) {
-      case 'status':
-        return (
-          <div key={index} style={{ marginBottom: 4 }}>
-            <Tag icon={<Spin size="small" />} color="processing" style={{ fontSize: 11 }}>
-              {msg.content}
-              {msg.data?.round && ` (${msg.data.round}轮)`}
-            </Tag>
-          </div>
-        );
-      case 'thinking':
-        return (
-          <div key={index} style={{ marginBottom: 4 }}>
-            <Collapse ghost size="small">
-              <Collapse.Panel
-                header={<span style={{ color: COLORS.textSecondary, fontSize: 11 }}><BulbOutlined /> 思考</span>}
-                key="1"
-              >
-                <Paragraph style={{ margin: 0, color: COLORS.textSecondary, fontSize: 11 }}>{msg.content}</Paragraph>
-              </Collapse.Panel>
-            </Collapse>
-          </div>
-        );
-      case 'sources':
-        return (
-          <div key={index} style={{ marginBottom: 4 }}>
-            <Tag icon={<FileTextOutlined />} color="green" style={{ fontSize: 11 }}>{msg.content}</Tag>
-          </div>
-        );
-      case 'prompt':
-        return (
-          <div key={index} style={{ marginBottom: 4 }}>
-            <Tag icon={<InfoCircleOutlined />} color="warning" style={{ fontSize: 11 }}>{msg.content}</Tag>
-          </div>
-        );
-      case 'error':
-        return (
-          <div key={index} style={{ marginBottom: 4 }}>
-            <Tag icon={<CloseCircleOutlined />} color="error" style={{ fontSize: 11 }}>{msg.content}</Tag>
-          </div>
-        );
-      default:
-        return null;
-    }
-  };
-
   // 渲染单条对话
   const renderMessage = (entry, index) => {
     if (entry.role === 'user') {
@@ -161,19 +132,7 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
         <div style={{ maxWidth: '92%', width: '100%' }}>
           {/* 过程消息 */}
           {entry.processMessages && entry.processMessages.length > 0 && (
-            <Collapse ghost size="small" style={{ marginBottom: 4 }}>
-              <Collapse.Panel
-                header={
-                  <span style={{ color: COLORS.textSecondary, fontSize: 11 }}>
-                    <SearchOutlined style={{ marginRight: 4 }} />
-                    执行过程 ({entry.processMessages.length})
-                  </span>
-                }
-                key="1"
-              >
-                {entry.processMessages.map((msg, i) => renderProcessTag(msg, i))}
-              </Collapse.Panel>
-            </Collapse>
+            <ThinkingTimeline processMessages={entry.processMessages} isStreaming={false} />
           )}
 
           {/* 检索来源 */}
@@ -269,9 +228,7 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
         <div style={{ maxWidth: '92%', width: '100%' }}>
           {/* 实时过程消息 */}
           {processMessages.length > 0 && (
-            <div style={{ marginBottom: 4 }}>
-              {processMessages.map((msg, i) => renderProcessTag(msg, i))}
-            </div>
+            <ThinkingTimeline processMessages={processMessages} isStreaming={true} />
           )}
 
           {/* 实时来源 */}
@@ -394,6 +351,54 @@ function AgentSidebar({ visible, isDragging, activeNote, noteContent, onOpenDiff
                   </Tooltip>
                 </Space>
               </div>
+            </div>
+
+            {/* 会话历史列表 */}
+            <div style={{
+              borderBottom: `1px solid ${COLORS.borderLight}`,
+              background: '#fafafa',
+            }}>
+              <div
+                onClick={() => {
+                  if (!sessionListExpanded) loadSessions();
+                  setSessionListExpanded(!sessionListExpanded);
+                }}
+                style={{
+                  padding: '8px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <Space size={6}>
+                  <HistoryOutlined style={{ color: COLORS.textSecondary }} />
+                  <Text style={{ fontSize: 12, color: COLORS.textSecondary }}>
+                    会话历史
+                    {sessionList.length > 0 && ` (${sessionList.length})`}
+                  </Text>
+                </Space>
+                {sessionListExpanded ? (
+                  <UpOutlined style={{ fontSize: 10, color: COLORS.textTertiary }} />
+                ) : (
+                  <DownOutlined style={{ fontSize: 10, color: COLORS.textTertiary }} />
+                )}
+              </div>
+              {sessionListExpanded && (
+                <div style={{ padding: '0 12px 8px 12px' }}>
+                  <SessionList
+                    sessions={sessionList}
+                    currentSessionId={sessionId}
+                    loading={sessionListLoading}
+                    error={sessionListError}
+                    onSelect={switchSession}
+                    onRename={renameSession}
+                    onDelete={deleteSession}
+                    maxHeight={180}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 对话区域 */}

@@ -3,7 +3,7 @@ Pydantic 模型定义
 定义API请求和响应的数据模型
 """
 
-from .requests import SaveRequest, FileUpdateRequest, RAGRequest, UnifiedAgentRequest
+from .requests import SaveRequest, FileUpdateRequest, RAGRequest, UnifiedAgentRequest, SessionRenameRequest
 from .responses import (
     BaseResponse,
     DataResponse,
@@ -21,6 +21,9 @@ from .responses import (
     HybridCandidate,
     RerankResult,
     RAGDebugInfo,
+    # 会话管理响应模型
+    SessionMetadataResponse,
+    SessionDetailResponse,
 )
 from .stream_models import StreamChunk, StreamComplete, StreamError
 
@@ -29,6 +32,7 @@ __all__ = [
     'FileUpdateRequest',
     'RAGRequest',
     'UnifiedAgentRequest',
+    'SessionRenameRequest',
 
     # 新的统一响应模型
     'BaseResponse',
@@ -48,6 +52,9 @@ __all__ = [
     'HybridCandidate',
     'RerankResult',
     'RAGDebugInfo',
+    # 会话管理响应模型
+    'SessionMetadataResponse',
+    'SessionDetailResponse',
 
     # 流式模型
     'StreamChunk',

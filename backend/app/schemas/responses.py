@@ -166,3 +166,22 @@ class RAGDebugInfo(BaseModel):
     
     # 最终结果
     final_sources: list[RAGSource] = Field(default_factory=list)
+
+
+# ==================== 会话管理响应模型 ====================
+
+class SessionMetadataResponse(BaseModel):
+    """会话元数据"""
+    session_id: str
+    title: str
+    created_at: str
+    updated_at: str
+    turn_count: int
+    last_intent: str
+    referenced_documents: list[str] = Field(default_factory=list)
+
+
+class SessionDetailResponse(SessionMetadataResponse):
+    """会话详情（包含预览信息）"""
+    summary: str | None = None  # 历史摘要
+    preview_turns: list[dict] = Field(default_factory=list)  # 最近 3 轮对话预览

@@ -29,7 +29,7 @@ from ..nodes import (
     edit_document,
     format_document,
 )
-from ...memory import UnifiedMemoryManager, UnifiedSummarizer
+from ...memory import UnifiedMemoryManager, UnifiedSummarizer, SessionMetadataManager
 from infrastructure.logging.logger import get_logger
 
 logger = get_logger(__name__)
@@ -377,9 +377,72 @@ class UnifiedAgent:
             }
 
     async def _save_history(self, state: UnifiedAgentState) -> None:
-        """保存对话历史"""
+        """保存对话历史并更新元数据"""
+        session_id = state.get("session_id", "")
+        
         try:
-            memory = self._create_memory_manager(state.get("session_id", ""))
+            memory = self._create_memory_manager(session_id)
             await save_history(state, memory)
+            
+            # 更新会话元数据
+            await self._update_session_metadata(state)
+            
         except Exception as e:
             logger.error(f"[Unified Agent] 历史保存失败: {e}")
+    
+    async def _update_session_metadata(self, state: UnifiedAgentState) -> None:
+        """更新会话元数据"""
+        session_id = state.get("session_id", "")
+        if not session_id:
+            return
+        
+        try:
+            metadata_manager = SessionMetadataManager()
+            
+            # 检查是否是首轮对话（需要生成标题）
+            is_first_turn = not metadata_manager.session_exists(session_id)
+            
+            if is_first_turn:
+                # 创建会话并使用 LLM 生成标题
+                metadata_manager.create_session(session_id)
+                await self._generate_session_title(
+                    metadata_manager, session_id, state.get("user_input", "")
+                )
+            else:
+                # 更新现有会话元数据
+                metadata_manager.increment_turn_count(session_id)
+                metadata_manager.update_session(
+                    session_id,
+                    last_intent=state.get("intent_type", "chitchat"),
+                    document_ref=state.get("document_name"),
+                )
+        except Exception as e:
+            logger.warning(f"[Unified Agent] 元数据更新失败: {e}")
+    
+    async def _generate_session_title(
+        self,
+        metadata_manager: SessionMetadataManager,
+        session_id: str,
+        user_input: str
+    ) -> None:
+        """使用 LLM 生成会话标题"""
+        if not user_input or not self._chat_model:
+            return
+        
+        try:
+            # 构建标题生成提示
+            prompt = f"""请为以下对话生成一个简短的标题（10-20字以内），直接返回标题文字，不要加引号或其他标点：
+
+用户消息：{user_input[:200]}
+
+标题："""
+            
+            from langchain_core.messages import HumanMessage
+            response = await self._chat_model.ainvoke([HumanMessage(content=prompt)])
+            title = response.content.strip()[:30]
+            
+            if title:
+                metadata_manager.update_session(session_id, title=title)
+                logger.info(f"[Unified Agent] 生成会话标题: {session_id} -> {title}")
+        except Exception as e:
+            logger.warning(f"[Unified Agent] 标题生成失败: {e}")

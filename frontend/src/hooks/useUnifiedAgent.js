@@ -3,7 +3,7 @@
  * 替换 useAIChat + useRAG，调用 unifiedAgentStream API
  */
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { unifiedAgentStream, readEventStream } from '../api/ai';
+import { unifiedAgentStream, readEventStream, getSessionHistory } from '../api/ai';
 import { useSession } from './useSession';
 
 export function useUnifiedAgent() {
@@ -36,6 +36,66 @@ export function useUnifiedAgent() {
   useEffect(() => {
     streamStateRef.current = streamState;
   }, [streamState]);
+
+  // 监听会话切换事件
+  useEffect(() => {
+    const handleSessionSwitch = async (event) => {
+      const { sessionId: switchedId, isNew } = event.detail || {};
+      // 清空当前状态
+      setConversations([]);
+      setUserInput('');
+      setStreamState({ processMessages: [], answer: '', diff: '', sources: [] });
+      setPreviewMode(false);
+      setPendingDiff(null);
+      
+      // 如果正在生成，停止
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
+
+      // 切换到已有会话时，加载历史消息
+      if (!isNew && switchedId) {
+        await loadSessionHistory(switchedId);
+      }
+    };
+
+    window.addEventListener('session-switched', handleSessionSwitch);
+    return () => window.removeEventListener('session-switched', handleSessionSwitch);
+  }, []);
+
+  // 从 API 加载会话历史并填充 conversations
+  const loadSessionHistory = useCallback(async (targetSessionId) => {
+    try {
+      const data = await getSessionHistory(targetSessionId);
+      if (data && data.messages && data.messages.length > 0) {
+        const restored = data.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp ? new Date(msg.timestamp).getTime() : null,
+          ...(msg.role === 'assistant' ? {
+            sources: msg.retrieval_sources || [],
+            diff: null,
+            editedContent: null,
+            diffApplied: false,
+            processMessages: [],
+            stats: null,
+            error: null,
+          } : {}),
+        }));
+        setConversations(restored);
+      }
+    } catch (error) {
+      console.error('加载会话历史失败:', error);
+    }
+  }, []);
+
+  // 应用启动时加载当前会话的历史
+  useEffect(() => {
+    if (sessionId) {
+      loadSessionHistory(sessionId);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 发送消息
   const sendMessage = useCallback(async (inputText, documentContent, documentName) => {

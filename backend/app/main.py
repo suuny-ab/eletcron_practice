@@ -22,11 +22,6 @@ from infrastructure.config.config_context import ConfigModel
 from domain.ai.models.model_provider import ModelProvider
 
 
-# 导入清理服务
-from .services.cleanup_service import SessionCleanupService
-
-
-# 导入容器配置
 from .container_config import configure_container
 from core.container import get_container
 from core.interfaces import (
@@ -50,9 +45,6 @@ async def lifespan(app: FastAPI):
     configure_container()
     container = get_container()
 
-    # 获取清理服务
-    app.state.cleanup_service = container.resolve(SessionCleanupService)
-
     # 获取配置上下文
     app.state.config_context = container.resolve(IConfigContext)
     
@@ -67,12 +59,6 @@ async def lifespan(app: FastAPI):
 
             # 更新配置上下文（不持久化，因为只是从磁盘加载）
             app.state.config_context.update(config, persist=False)
-
-            # 启动时自动清理孤儿会话
-            if config.obsidian_vault_path:
-                cleaned_count = await app.state.cleanup_service.cleanup_orphaned_sessions()
-                if cleaned_count > 0:
-                    logger.info(f"启动时清理了 {cleaned_count} 个孤儿会话")
         else:
             logger.warning("未找到配置文件，请在界面中配置")
     except Exception as e:
@@ -160,21 +146,7 @@ def _register_config_listeners(app: FastAPI):
     
     app.state.config_context.register_listener(update_prompts, name="update_prompts")
     
-    # 监听器 3：更新清理服务的笔记根目录
-    def update_cleanup_notes_root(config):
-        """更新清理服务的笔记根目录"""
-        previous_notes_root = getattr(app.state.cleanup_service, "notes_root", None)
-        if config.obsidian_vault_path:
-            app.state.cleanup_service.notes_root = Path(config.obsidian_vault_path)
-        
-        def rollback():
-            app.state.cleanup_service.notes_root = previous_notes_root
-        
-        return rollback
-    
-    app.state.config_context.register_listener(update_cleanup_notes_root, name="update_cleanup_notes_root")
-    
-    # 监听器 4：初始化 RAG 服务
+    # 监听器 3：初始化 RAG 服务
     def init_rag_service(config):
         """初始化 RAG 服务"""
         from domain.knowledge.rag.rag_service import RAGService
