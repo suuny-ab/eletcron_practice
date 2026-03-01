@@ -1,6 +1,7 @@
 /**
  * RAG 调试面板组件
  * 可视化展示 RAG 检索流程的各个阶段
+ * 支持动态 rerank：LLM 自主决定返回数量
  */
 import React, { useState, useCallback } from 'react';
 import {
@@ -18,8 +19,8 @@ import {
   Tooltip,
   Empty,
   Spin,
-  InputNumber,
   message,
+  Alert,
 } from 'antd';
 import {
   SearchOutlined,
@@ -29,6 +30,8 @@ import {
   ClockCircleOutlined,
   CheckCircleOutlined,
   FileTextOutlined,
+  RightOutlined,
+  FilterOutlined,
 } from '@ant-design/icons';
 import { ragDebug } from '../../api/ai';
 
@@ -41,7 +44,7 @@ const { Text, Title } = Typography;
  */
 const TokensDisplay = ({ tokens }) => {
   if (!tokens || tokens.length === 0) return <Text type="secondary">-</Text>;
-  
+
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
       {tokens.slice(0, 20).map((token, idx) => (
@@ -94,13 +97,61 @@ const SourceTag = ({ source }) => {
 };
 
 /**
+ * 检索管道概览 - 漏斗可视化
+ */
+const PipelineOverview = ({ debugInfo }) => {
+  const vectorCount = debugInfo.vector_search?.length || 0;
+  const bm25Count = debugInfo.bm25_search?.length || 0;
+  const hybridCount = debugInfo.hybrid_candidates?.length || 0;
+  const rerankSelected = debugInfo.rerank_results?.filter((r) => r.selected).length || 0;
+  const finalCount = debugInfo.final_sources?.length || 0;
+
+  const stages = [
+    { label: '向量召回', count: vectorCount, color: '#722ed1', icon: <ThunderboltOutlined /> },
+    { label: 'BM25 召回', count: bm25Count, color: '#fa8c16', icon: <FileTextOutlined /> },
+    { label: '混合去重', count: hybridCount, color: '#1890ff', icon: <MergeCellsOutlined /> },
+    { label: 'LLM 筛选', count: rerankSelected, color: '#52c41a', icon: <FilterOutlined /> },
+    { label: '最终结果', count: finalCount, color: '#f5222d', icon: <CheckCircleOutlined /> },
+  ];
+
+  return (
+    <Card size="small" style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, flexWrap: 'wrap' }}>
+        {stages.map((stage, idx) => (
+          <React.Fragment key={stage.label}>
+            <div style={{
+              textAlign: 'center',
+              padding: '8px 16px',
+              borderRadius: 8,
+              background: `${stage.color}08`,
+              border: `1px solid ${stage.color}30`,
+              minWidth: 100,
+            }}>
+              <div style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                {stage.icon} {stage.label}
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: stage.color }}>
+                {stage.count}
+              </div>
+            </div>
+            {idx < stages.length - 1 && (
+              <RightOutlined style={{ color: '#ccc', fontSize: 16 }} />
+            )}
+          </React.Fragment>
+        ))}
+      </div>
+    </Card>
+  );
+};
+
+/**
  * RAG 调试面板
  */
 export function RAGDebugPanel() {
   const [query, setQuery] = useState('');
-  const [topK, setTopK] = useState(3);
   const [loading, setLoading] = useState(false);
   const [debugInfo, setDebugInfo] = useState(null);
+  const [error, setError] = useState(null);
 
   // 执行调试查询
   const handleDebugQuery = useCallback(async () => {
@@ -110,21 +161,24 @@ export function RAGDebugPanel() {
     }
 
     setLoading(true);
+    setError(null);
+    setDebugInfo(null);
     try {
-      const info = await ragDebug(query, topK);
+      const info = await ragDebug(query);
       setDebugInfo(info);
-    } catch (error) {
-      message.error('调试查询失败: ' + error.message);
+    } catch (err) {
+      console.error('[RAG Debug] 查询失败:', err);
+      setError(err.message || '未知错误');
+      message.error('调试查询失败: ' + (err.message || '未知错误'));
     } finally {
       setLoading(false);
     }
-  }, [query, topK]);
+  }, [query]);
 
   // 向量检索结果表格列
   const vectorColumns = [
     {
       title: '#',
-      dataIndex: 'index',
       key: 'index',
       width: 40,
       render: (_, __, idx) => idx + 1,
@@ -179,7 +233,6 @@ export function RAGDebugPanel() {
   const bm25Columns = [
     {
       title: '#',
-      dataIndex: 'index',
       key: 'index',
       width: 40,
       render: (_, __, idx) => idx + 1,
@@ -234,7 +287,6 @@ export function RAGDebugPanel() {
   const hybridColumns = [
     {
       title: '#',
-      dataIndex: 'index',
       key: 'index',
       width: 40,
       render: (_, __, idx) => idx + 1,
@@ -343,12 +395,15 @@ export function RAGDebugPanel() {
     },
   ];
 
+  const rerankTotal = debugInfo?.rerank_results?.length || 0;
+  const rerankSelected = debugInfo?.rerank_results?.filter((r) => r.selected).length || 0;
+
   return (
     <div style={{ padding: '24px', maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ marginBottom: 24 }}>
         <Title level={3} style={{ marginBottom: 8 }}>RAG 调试面板</Title>
         <Text type="secondary">
-          可视化展示 RAG 检索流程：向量检索、BM25 检索、混合评分、LLM 重排序
+          可视化展示 RAG 检索流程：向量检索 → BM25 检索 → 混合评分 → LLM 动态重排序
         </Text>
       </div>
 
@@ -357,7 +412,7 @@ export function RAGDebugPanel() {
         <Row gutter={16} align="middle">
           <Col flex="auto">
             <TextArea
-              placeholder="输入查询内容以调试 RAG 检索流程..."
+              placeholder="输入查询内容以调试 RAG 检索流程...（Ctrl+Enter 发送）"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               rows={2}
@@ -367,28 +422,32 @@ export function RAGDebugPanel() {
             />
           </Col>
           <Col>
-            <Space direction="vertical">
-              <InputNumber
-                addonBefore="Top-K"
-                min={1}
-                max={10}
-                value={topK}
-                onChange={setTopK}
-                style={{ width: 120 }}
-              />
-              <Button
-                type="primary"
-                icon={<SearchOutlined />}
-                onClick={handleDebugQuery}
-                loading={loading}
-                block
-              >
-                调试查询
-              </Button>
-            </Space>
+            <Button
+              type="primary"
+              icon={<SearchOutlined />}
+              onClick={handleDebugQuery}
+              loading={loading}
+              size="large"
+              style={{ height: 58 }}
+            >
+              调试查询
+            </Button>
           </Col>
         </Row>
       </Card>
+
+      {/* 错误提示 */}
+      {error && !loading && (
+        <Alert
+          message="查询失败"
+          description={error}
+          type="error"
+          showIcon
+          closable
+          style={{ marginBottom: 16 }}
+          onClose={() => setError(null)}
+        />
+      )}
 
       {/* 加载状态 */}
       {loading && (
@@ -400,6 +459,9 @@ export function RAGDebugPanel() {
       {/* 调试结果 */}
       {debugInfo && !loading && (
         <>
+          {/* 检索管道概览 */}
+          <PipelineOverview debugInfo={debugInfo} />
+
           {/* 查询信息和检索配置 */}
           <Row gutter={16} style={{ marginBottom: 16 }}>
             <Col span={16}>
@@ -506,7 +568,7 @@ export function RAGDebugPanel() {
               </Col>
               <Col span={4}>
                 <Statistic
-                  title="结果数量"
+                  title="最终结果"
                   value={debugInfo.final_sources?.length || 0}
                   suffix="条"
                   valueStyle={{ fontSize: 18 }}
@@ -517,7 +579,7 @@ export function RAGDebugPanel() {
 
           {/* 检索步骤详情 */}
           <Collapse
-            defaultActiveKey={['vector', 'bm25', 'hybrid', 'rerank']}
+            defaultActiveKey={['rerank']}
             style={{ marginBottom: 16 }}
           >
             {/* 向量检索 */}
@@ -595,19 +657,27 @@ export function RAGDebugPanel() {
               )}
             </Panel>
 
-            {/* LLM 重排序 */}
+            {/* LLM 动态重排序 */}
             <Panel
               header={
                 <Space>
                   <OrderedListOutlined style={{ color: '#52c41a' }} />
-                  <span>步骤 4：LLM 重排序</span>
+                  <span>步骤 4：LLM 动态重排序</span>
                   <Tag color="green">
-                    已选中 {debugInfo.rerank_results?.filter((r) => r.selected).length || 0} 条
+                    从 {rerankTotal} 个候选中选出 {rerankSelected} 条
                   </Tag>
                 </Space>
               }
               key="rerank"
             >
+              {rerankTotal > 0 && (
+                <Alert
+                  message={`LLM 自主判断相关性，从 ${rerankTotal} 个候选中动态选出 ${rerankSelected} 条相关结果`}
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: 12 }}
+                />
+              )}
               {debugInfo.rerank_results?.length > 0 ? (
                 <Table
                   columns={rerankColumns}
@@ -662,7 +732,7 @@ export function RAGDebugPanel() {
       )}
 
       {/* 空状态 */}
-      {!debugInfo && !loading && (
+      {!debugInfo && !loading && !error && (
         <div style={{ textAlign: 'center', padding: '80px 20px' }}>
           <Empty
             description="输入查询内容并点击「调试查询」以分析 RAG 检索流程"

@@ -98,15 +98,16 @@ class RagQaConfig(PromptConfig):
 class RerankConfig(PromptConfig):
     """检索重排序配置"""
     system: str = """
-你是一个检索重排序助手。根据用户问题，从候选文本中选出最相关的若干条。
+你是一个检索重排序助手。根据用户问题，从候选文本中选出真正相关的条目。
+相关性是唯一标准——如果没有相关候选，返回空数组[]；如果只有少数相关，只返回那几条。
+不要为了凑数而返回不相关的内容。
 仅输出JSON数组，元素是候选的索引（整数），按相关性从高到低排序。"""
     human: str = """
 问题：{question}
-需要返回数量：{top_k}
 候选列表：
 {candidates}
 """
-    params: list[str] = ['question', 'top_k', 'candidates']
+    params: list[str] = ['question', 'candidates']
 
 
 class SummaryConfig(PromptConfig):

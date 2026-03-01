@@ -4,17 +4,16 @@ import ConfigPage from './Config';
 import { ResizableDivider } from '../components/common';
 import { FileTree } from '../components/FileTree';
 import { NoteEditor } from '../components/NoteEditor';
-import { AISidebar } from '../components/AISidebar';
+import { AgentSidebar } from '../components/AgentSidebar';
 import { useFileTree } from '../hooks/useFileTree';
-import { useAIChat } from '../hooks/useAIChat';
-import { useRAG } from '../hooks/useRAG';
 import { useNoteManager } from '../hooks/useNoteManager';
+import { updateFileContent } from '../api/knowledge';
 import { COLORS, SHADOWS, TRANSITIONS } from '../styles/tokens';
 import 'highlight.js/styles/github.css';
 
 const { Sider, Content } = Layout;
 
-function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSidebarVisible, setAiSidebarVisible, configTabVisible, onConfigTabClose, configTabRequestId }) {
+function KnowledgePage({ leftSidebarCollapsed, aiSidebarVisible, configTabVisible, onConfigTabClose, configTabRequestId }) {
   // 文件树状态
   const {
     treeData, loading, expandedKeys, selectedKeys,
@@ -29,72 +28,27 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     noteStates,
     noteDefaults,
     activeMainTab,
-    activeNoteKey,
     activeNote,
     activeNoteState,
     setActiveMainTab,
-    setOpenChunks,
     updateTabForConfig,
     updateNoteState,
-    getNoteState,
     handleSelect,
     openRagChunk,
     handleStartEdit,
     handleCancelEdit,
     handleSave,
     handleTabClose,
-    findAndExpandPath,
-    handleConfirmAiResult,
   } = useNoteManager(configTabVisible, configTabRequestId, onConfigTabClose);
 
-  // AI 对话状态
-  const {
-    aiMode,
-    chatMessages,
-    userInput,
-    aiGenerating,
-    previewMode,
-    originalContent,
-    generatedContent,
-    setAiMode,
-    setChatMessages,
-    setUserInput,
-    setPreviewMode,
-    setOriginalContent,
-    setGeneratedContent,
-    cancelGeneration,
-    sendAdviseMessage,
-    sendEditRequest,
-    sendOptimizeRequest,
-    resetChat,
-    addMessage,
-    updateLastMessage,
-  } = useAIChat();
-
-  // RAG 状态
-  const {
-    ragMessages,
-    ragSources,
-    ragTopK,
-    ragLoading,
-    currentQueryId,
-    setRagMessages,
-    setRagSources,
-    setRagTopK,
-    sendRagQuery,
-    cancelQuery,
-    resetRag,
-    clearHistory,
-  } = useRAG();
+  // Diff 对比标签页状态
+  const [diffTabConfig, setDiffTabConfig] = useState(null);
 
   // 拖动调整宽度状态
   const [leftSiderWidth, setLeftSiderWidth] = useState(20); // 百分比
   const [rightSiderWidth, setRightSiderWidth] = useState(28); // 百分比
   const [isDragging, setIsDragging] = useState(null); // 'left' | 'right' | null
   const containerRef = useRef(null);
-
-  const fileContent = activeNoteState.content;
-  const selectedFile = activeNote ? { key: activeNote.key, title: activeNote.title } : null;
 
   // 页面加载时读取文件树
   useEffect(() => {
@@ -113,147 +67,56 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
     }
   }, [configTabRequestId, setActiveMainTab]);
 
-  // 切换笔记时重置AI聊天状态
-  useEffect(() => {
-    if (activeNoteKey) {
-      resetChat();
-    }
-  }, [activeNoteKey, resetChat]);
+  // 打开主区域双栏对比标签页
+  const handleOpenDiffTab = useCallback((info) => {
+    setDiffTabConfig(info);
+    setActiveMainTab('diff:preview');
+  }, [setActiveMainTab]);
 
-  // 切换到 RAG 模式时清空对话历史
-  useEffect(() => {
-    if (aiMode === 'rag') {
-      clearHistory();
-    }
-  }, [aiMode, clearHistory]);
-
-
-  // AI 消息发送
-  const handleSendAiMessage = useCallback(async () => {
-    if (!userInput.trim()) {
-      message.warning('请输入问题');
+  // Diff 确认保存 - 直接用 noteKey 保存，避免 activeNoteKey 因切换标签变 null
+  const handleDiffConfirm = useCallback(async (content) => {
+    const noteKey = diffTabConfig?.noteKey;
+    if (!noteKey) {
+      message.error('无法确定目标文档');
       return;
     }
-
-    // RAG 模式：知识库问答
-    if (aiMode === 'rag') {
-      const question = userInput.trim();
-      setUserInput('');
-
-      // 清空分块标签
-      setOpenChunks([]);
-
-      try {
-        await sendRagQuery(question, { topK: ragTopK });
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          message.error('RAG 问答失败: ' + error.message);
-        }
-      }
-      return;
-    }
-
-    // 非 RAG 模式需要选择笔记
-    if (!activeNoteKey) {
-      message.warning('请选择笔记');
-      return;
-    }
-
-    // AI编辑模式
-    if (aiMode === 'edit') {
-      setPreviewMode(true);
-      setOriginalContent(fileContent);
-      setGeneratedContent('');
-
-      try {
-        const content = await sendEditRequest(activeNoteKey, userInput, (chunk) => {
-          setGeneratedContent(prev => prev + (chunk || ''));
-        });
-      } catch (error) {
-        if (error.name !== 'AbortError') {
-          message.error('AI 编辑失败: ' + error.message);
-          setPreviewMode(false);
-          setOriginalContent('');
-          setGeneratedContent('');
-        }
-      }
-      return;
-    }
-
-    // AI建议模式：在对话中显示
-    addMessage('user', userInput);
-    addMessage('assistant', '');  // 先添加空的AI消息占位
-    setUserInput('');
-
     try {
-      await sendAdviseMessage(activeNoteKey, userInput, (chunk, fullContent) => {
-        updateLastMessage(fullContent);
-      });
+      updateNoteState(noteKey, { saveLoading: true });
+      await updateFileContent(noteKey, content);
+      updateNoteState(noteKey, { content, editContent: content, hasLoaded: true, saveLoading: false });
+      message.success('AI 生成的内容已保存到文件');
     } catch (error) {
-      if (error.name !== 'AbortError') {
-        updateLastMessage(`错误：${error.message}`);
-      }
-    }
-  }, [userInput, aiMode, activeNoteKey, fileContent, ragTopK, sendRagQuery, sendEditRequest, sendAdviseMessage, addMessage, updateLastMessage, setUserInput, setPreviewMode, setOriginalContent, setGeneratedContent, setOpenChunks]);
-
-  // 一键排版
-  const handleOneClickOptimize = useCallback(async () => {
-    if (!activeNoteKey) {
-      message.warning('请先选择笔记');
+      updateNoteState(noteKey, { saveLoading: false });
+      message.error('保存失败: ' + (error.response?.data?.message || error.message));
       return;
     }
+    setDiffTabConfig(prev => {
+      prev?.onApplied?.();
+      return null;
+    });
+    setActiveMainTab(`note:${noteKey}`);
+  }, [diffTabConfig, updateNoteState, setActiveMainTab]);
 
-    setPreviewMode(true);
-    setOriginalContent(fileContent);
-    setGeneratedContent('');
-
-    try {
-      const content = await sendOptimizeRequest(activeNoteKey, (chunk) => {
-        setGeneratedContent(prev => prev + (chunk || ''));
-      });
-    } catch (error) {
-      if (error.name !== 'AbortError') {
-        message.error('排版失败: ' + error.message);
-        setPreviewMode(false);
-        setOriginalContent('');
-        setGeneratedContent('');
-      }
+  // Diff 取消
+  const handleDiffCancel = useCallback(() => {
+    const noteKey = diffTabConfig?.noteKey;
+    setDiffTabConfig(prev => {
+      prev?.onCancelled?.();
+      return null;
+    });
+    if (noteKey) {
+      setActiveMainTab(`note:${noteKey}`);
     }
-  }, [activeNoteKey, fileContent, sendOptimizeRequest, setPreviewMode, setOriginalContent, setGeneratedContent]);
+  }, [diffTabConfig, setActiveMainTab]);
 
-  // 取消 AI 生成或结果
-  const handleCancelAiResult = useCallback(() => {
-    if (aiGenerating) {
-      cancelGeneration();
+  // Tab 关闭（含 diff 标签页处理）
+  const handleTabCloseWithDiff = useCallback((key) => {
+    if (key === 'diff:preview') {
+      handleDiffCancel();
+      return;
     }
-    if (ragLoading) {
-      cancelQuery();
-    }
-    setPreviewMode(false);
-    setOriginalContent('');
-    setGeneratedContent('');
-  }, [aiGenerating, ragLoading, cancelGeneration, cancelQuery, setPreviewMode, setOriginalContent, setGeneratedContent]);
-
-  // 确认保存AI生成的内容（包装函数）
-  const handleConfirmAiResultWrapper = useCallback(async (generatedContent) => {
-    // 保存用户输入用于添加对话记录
-    const userRequirement = userInput;
-    
-    await handleConfirmAiResult(generatedContent);
-    
-    // 保存成功后：添加对话记录、重置预览模式、清空输入框
-    if (aiMode === 'edit' && userRequirement) {
-      addMessage('user', `编辑要求: ${userRequirement}`);
-      addMessage('assistant', generatedContent);
-    }
-    
-    setPreviewMode(false);
-    setOriginalContent('');
-    setGeneratedContent('');
-    setUserInput('');
-  }, [handleConfirmAiResult, setPreviewMode, setOriginalContent, setGeneratedContent, setUserInput, aiMode, addMessage, userInput]);
-
-
+    handleTabClose(key);
+  }, [handleTabClose, handleDiffCancel]);
 
   const handleLeftDragState = useCallback((dragging) => setIsDragging(dragging ? 'left' : null), []);
   const handleRightDragState = useCallback((dragging) => setIsDragging(dragging ? 'right' : null), []);
@@ -310,7 +173,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
         <NoteEditor
           activeTab={activeMainTab}
           onTabChange={setActiveMainTab}
-          onTabClose={handleTabClose}
+          onTabClose={handleTabCloseWithDiff}
           openNotes={openNotes}
           openChunks={openChunks}
           noteStates={noteStates}
@@ -321,6 +184,14 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
           onCancelEdit={handleCancelEdit}
           onSave={handleSave}
           onNoteStateChange={updateNoteState}
+          diffTab={diffTabConfig ? {
+            originalContent: diffTabConfig.originalContent,
+            editedContent: diffTabConfig.editedContent,
+            diffText: diffTabConfig.diffText,
+            documentName: diffTabConfig.documentName,
+            onConfirm: handleDiffConfirm,
+            onCancel: handleDiffCancel,
+          } : null}
         />
       </Content>
 
@@ -333,7 +204,7 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
         onDragStateChange={handleRightDragState}
       />
 
-      {/* AI 侧边栏 */}
+      {/* AI Agent 侧边栏 */}
       <Sider
         width={`${rightSiderWidth}%`}
         collapsed={!aiSidebarVisible}
@@ -348,28 +219,13 @@ function KnowledgePage({ leftSidebarCollapsed, setLeftSidebarCollapsed, aiSideba
           height: '100%',
         }}
       >
-        <AISidebar
+        <AgentSidebar
           visible={aiSidebarVisible}
-          aiMode={aiMode}
-          onModeChange={setAiMode}
-          chatMessages={chatMessages}
-          ragMessages={ragMessages}
-          ragSources={ragSources}
-          userInput={userInput}
-          onInputChange={setUserInput}
-          onSend={handleSendAiMessage}
-          onOptimize={handleOneClickOptimize}
-          ragTopK={ragTopK}
-          onTopKChange={setRagTopK}
-          previewMode={previewMode}
-          generatedContent={generatedContent}
-          aiGenerating={aiGenerating}
-          ragLoading={ragLoading}
-          onConfirmPreview={handleConfirmAiResultWrapper}
-          onCancelPreview={handleCancelAiResult}
-          selectedFile={selectedFile}
-          onOpenChunk={(source, index) => openRagChunk(source, index, currentQueryId)}
           isDragging={isDragging}
+          activeNote={activeNote}
+          noteContent={activeNoteState?.content ?? null}
+          onOpenDiffTab={handleOpenDiffTab}
+          onOpenChunk={(source, index) => openRagChunk(source, index, 0)}
         />
       </Sider>
     </div>

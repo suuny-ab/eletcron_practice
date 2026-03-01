@@ -3,7 +3,7 @@ Pydantic 模型定义
 定义API请求和响应的数据模型
 """
 
-from .requests import ChatRequest, SaveRequest, OptimizeRequest, EditRequest, FileUpdateRequest, RAGRequest
+from .requests import ChatRequest, SaveRequest, OptimizeRequest, EditRequest, FileUpdateRequest, RAGRequest, RAGAgentRequest, UnifiedAgentRequest
 from .responses import (
     BaseResponse,
     DataResponse,
@@ -31,6 +31,8 @@ __all__ = [
     'EditRequest',
     'FileUpdateRequest',
     'RAGRequest',
+    'RAGAgentRequest',
+    'UnifiedAgentRequest',
 
     # 新的统一响应模型
     'BaseResponse',

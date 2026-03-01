@@ -45,3 +45,22 @@ class RAGRequest(BaseModel):
     """RAG 问答请求模型"""
     question: str
     top_k: int = 3  # 返回的最相关文档数量
+
+
+class RAGAgentRequest(BaseModel):
+    """RAG Agent 请求模型（已废弃，使用 UnifiedAgentRequest）"""
+    question: str
+    top_k: int = 3  # 检索数量
+    max_rounds: int = 3  # 最大检索轮次
+    note_context: str | None = None  # 当前笔记上下文（可选）
+
+
+class UnifiedAgentRequest(BaseModel):
+    """统一 Agent 请求模型"""
+    user_input: str                          # 用户输入
+    session_id: str = ""                     # 会话 ID
+    permission_mode: str = "assistant"       # 权限模式: assistant / editor
+    document_content: str | None = None      # 文档内容（可选）
+    document_name: str | None = None         # 文档名称（可选）
+    top_k: int = 3                           # RAG 检索 fallback 数量（仅在 rerank 失败时使用）
+    max_rounds: int = 3                      # RAG 最大检索轮次

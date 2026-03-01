@@ -22,7 +22,7 @@ class MockLLMTaskService:
     """Mock LLM 任务服务"""
 
     def __init__(self, rerank_result=None):
-        self.rerank_result = rerank_result or [0, 1, 2]
+        self.rerank_result = rerank_result if rerank_result is not None else [0, 1, 2]
         self.invoke_calls = []
 
     def invoke(self, task_type: str, **kwargs):
@@ -107,7 +107,7 @@ class TestLLMRerank:
             {"content": "文档2"},
         ]
 
-        indices = service._llm_rerank("测试问题", candidates, top_k=3)
+        indices = service._llm_rerank("测试问题", candidates)
 
         assert indices == [2, 0, 1]
         assert len(mock_llm.invoke_calls) == 1
@@ -121,11 +121,11 @@ class TestLLMRerank:
 
         service = RetrievalService(mock_vectorstore, mock_bm25, mock_llm)
 
-        indices = service._llm_rerank("测试问题", [], top_k=3)
+        indices = service._llm_rerank("测试问题", [])
         assert indices == []
 
     def test_rerank_zero_top_k(self):
-        """测试 top_k 为 0"""
+        """测试空候选列表（原 top_k=0 场景不再适用，仅测试空列表）"""
         mock_vectorstore = MockVectorStore()
         mock_bm25 = BM25Index()
         mock_llm = MockLLMTaskService()
@@ -133,7 +133,9 @@ class TestLLMRerank:
         service = RetrievalService(mock_vectorstore, mock_bm25, mock_llm)
 
         candidates = [{"content": "文档0"}]
-        indices = service._llm_rerank("测试问题", candidates, top_k=0)
+        # 即使只有一个候选，LLM也可以选择不返回
+        mock_llm.rerank_result = []
+        indices = service._llm_rerank("测试问题", candidates)
         assert indices == []
 
     def test_rerank_filters_invalid_indices(self):
@@ -151,7 +153,7 @@ class TestLLMRerank:
             {"content": "文档2"},
         ]
 
-        indices = service._llm_rerank("测试问题", candidates, top_k=3)
+        indices = service._llm_rerank("测试问题", candidates)
 
         # 只保留有效索引
         assert all(0 <= i < len(candidates) for i in indices)
@@ -171,7 +173,7 @@ class TestLLMRerank:
             {"content": "文档2"},
         ]
 
-        indices = service._llm_rerank("测试问题", candidates, top_k=5)
+        indices = service._llm_rerank("测试问题", candidates)
 
         # 应该去重
         assert len(indices) == len(set(indices))
@@ -187,7 +189,7 @@ class TestLLMRerank:
         long_content = "x" * 500
         candidates = [{"content": long_content}]
 
-        service._llm_rerank("测试问题", candidates, top_k=1)
+        service._llm_rerank("测试问题", candidates)
 
         # 检查传递给 LLM 的内容被截断
         call = mock_llm.invoke_calls[0]
@@ -205,7 +207,7 @@ class TestLLMRerank:
         candidates = [{"content": "文档0"}]
 
         with pytest.raises(ValueError, match="rerank 返回结果不是JSON数组"):
-            service._llm_rerank("测试问题", candidates, top_k=1)
+            service._llm_rerank("测试问题", candidates)
 
     def test_rerank_invalid_index_type(self):
         """测试 LLM 返回非整数索引时抛出异常"""
@@ -219,7 +221,66 @@ class TestLLMRerank:
         candidates = [{"content": "文档0"}]
 
         with pytest.raises(ValueError, match="rerank 返回包含非整数索引"):
-            service._llm_rerank("测试问题", candidates, top_k=1)
+            service._llm_rerank("测试问题", candidates)
+
+    def test_rerank_returns_subset(self):
+        """测试 LLM 从多个候选中只选出部分，验证不填充"""
+        mock_vectorstore = MockVectorStore()
+        mock_bm25 = BM25Index()
+        mock_llm = MockLLMTaskService(rerank_result=[1, 3])
+
+        service = RetrievalService(mock_vectorstore, mock_bm25, mock_llm)
+
+        candidates = [
+            {"content": "文档0"},
+            {"content": "文档1"},
+            {"content": "文档2"},
+            {"content": "文档3"},
+            {"content": "文档4"},
+        ]
+
+        indices = service._llm_rerank("测试问题", candidates)
+
+        # LLM 只返回 2 条，不会被填充到更多
+        assert indices == [1, 3]
+        assert len(indices) == 2
+
+    def test_rerank_returns_empty_array(self):
+        """测试 LLM 返回空数组（无相关候选），验证合法"""
+        mock_vectorstore = MockVectorStore()
+        mock_bm25 = BM25Index()
+        mock_llm = MockLLMTaskService(rerank_result=[])
+
+        service = RetrievalService(mock_vectorstore, mock_bm25, mock_llm)
+
+        candidates = [
+            {"content": "文档0"},
+            {"content": "文档1"},
+        ]
+
+        indices = service._llm_rerank("测试问题", candidates)
+        assert indices == []
+
+    def test_rerank_returns_all(self):
+        """测试 LLM 返回所有候选索引，验证全部通过"""
+        mock_vectorstore = MockVectorStore()
+        mock_bm25 = BM25Index()
+        mock_llm = MockLLMTaskService(rerank_result=[0, 1, 2, 3])
+
+        service = RetrievalService(mock_vectorstore, mock_bm25, mock_llm)
+
+        candidates = [
+            {"content": "文档0"},
+            {"content": "文档1"},
+            {"content": "文档2"},
+            {"content": "文档3"},
+        ]
+
+        indices = service._llm_rerank("测试问题", candidates)
+
+        # 所有候选都相关，全部返回
+        assert indices == [0, 1, 2, 3]
+        assert len(indices) == 4
 
 
 class TestRetrieveSources:

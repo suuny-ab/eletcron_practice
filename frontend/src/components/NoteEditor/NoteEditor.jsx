@@ -1,6 +1,7 @@
 import { Typography, Empty, Space, Tabs } from 'antd';
 import NoteTab from './NoteTab';
 import ChunkTab from './ChunkTab';
+import DiffTab from './DiffTab';
 import { COLORS } from '../../styles/tokens';
 
 const { Text, Paragraph } = Typography;
@@ -19,6 +20,7 @@ function NoteEditor({
   onCancelEdit,
   onSave,
   onNoteStateChange,
+  diffTab,
 }) {
   const getNoteState = (noteKey) => noteStates[noteKey] || noteDefaults;
 
@@ -49,6 +51,21 @@ function NoteEditor({
   const contentTabs = [...noteTabs, ...chunkTabs];
   const hasContentTabs = contentTabs.length > 0;
 
+  const diffTabItem = diffTab ? [{
+    key: 'diff:preview',
+    label: '变更对比',
+    closable: true,
+    children: (
+      <DiffTab
+        originalContent={diffTab.originalContent}
+        editedContent={diffTab.editedContent}
+        documentName={diffTab.documentName}
+        onConfirm={diffTab.onConfirm}
+        onCancel={diffTab.onCancel}
+      />
+    ),
+  }] : [];
+
   const tabItems = [
     ...(hasContentTabs ? contentTabs : [{
       key: 'notes',
@@ -69,6 +86,7 @@ function NoteEditor({
         />
       )
     }]),
+    ...diffTabItem,
     ...(configTabVisible && configTabContent ? [
       {
         key: 'config',

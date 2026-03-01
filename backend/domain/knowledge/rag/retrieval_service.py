@@ -57,19 +57,20 @@ class RetrievalService:
             return [1.0 for _ in scores]
         return [(score - min_score) / (max_score - min_score) for score in scores]
 
-    def _llm_rerank(self, question: str, candidates: list[dict], top_k: int) -> list[int]:
+    def _llm_rerank(self, question: str, candidates: list[dict]) -> list[int]:
         """
         使用LLM对候选进行重排序
+
+        LLM根据相关性自主决定返回多少条结果，不设固定数量约束。
 
         Args:
             question: 查询问题
             candidates: 候选文档列表
-            top_k: 返回数量
 
         Returns:
             重排序后的索引列表
         """
-        if not candidates or top_k <= 0:
+        if not candidates:
             return []
 
         snippets = []
@@ -83,7 +84,6 @@ class RetrievalService:
         indices = self._llm_task_service.invoke(
             task_type="rerank",
             question=question,
-            top_k=top_k,
             candidates=candidates_text
         )
 
@@ -98,8 +98,8 @@ class RetrievalService:
             if 0 <= idx < len(candidates) and idx not in seen:
                 seen.add(idx)
                 filtered.append(idx)
-            if len(filtered) >= top_k:
-                break
+
+        logger.info(f"[Rerank] LLM 从 {len(candidates)} 个候选中选出 {len(filtered)} 条相关结果")
         return filtered
 
     def retrieve_sources(self, question: str, top_k: int = 3) -> list[dict]:
@@ -186,7 +186,7 @@ class RetrievalService:
                 merged = merged[:min(HYBRID_TOP_K, len(merged))]
 
             # LLM重排序
-            rerank_indices = self._llm_rerank(question, merged, min(top_k, len(merged)))
+            rerank_indices = self._llm_rerank(question, merged)
             if rerank_indices:
                 selected = [merged[i] for i in rerank_indices]
             else:
@@ -383,7 +383,7 @@ class RetrievalService:
         # ==================== LLM重排序阶段 ====================
         rerank_start = time.perf_counter()
         try:
-            rerank_indices = self._llm_rerank(question, merged, min(top_k, len(merged)))
+            rerank_indices = self._llm_rerank(question, merged)
         except Exception as e:
             logger.warning(f"[RAG Debug] LLM重排序失败: {e}")
             rerank_indices = []

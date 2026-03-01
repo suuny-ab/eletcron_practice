@@ -180,22 +180,22 @@ export async function ragAskStream(params, options = {}) {
 /**
  * RAG 调试接口 - 获取详细检索步骤信息
  * @param {string} question - 用户问题
- * @param {number} topK - 检索的文档数量
  * @param {AbortSignal} signal - 中断信号
  * @returns {Promise<Object>} 调试信息
  */
-export async function ragDebug(question, topK = 3, signal) {
+export async function ragDebug(question, signal) {
   const response = await fetch(`${API_BASE_URL}/api/ai/rag/debug`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ question, top_k: topK }),
+    body: JSON.stringify({ question }),
     signal,
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP error! status: ${response.status}`);
+    const text = await response.text().catch(() => '');
+    throw new Error(`HTTP ${response.status}: ${text || response.statusText}`);
   }
 
   const result = await response.json();
@@ -204,4 +204,86 @@ export async function ragDebug(question, topK = 3, signal) {
   }
 
   return result.data;
+}
+
+/**
+ * RAG Agent 智能问答接口
+ * @param {Object} params - 请求参数
+ * @param {string} params.question - 用户问题
+ * @param {number} params.top_k - 检索数量
+ * @param {number} params.max_rounds - 最大检索轮次
+ * @param {string} params.note_context - 当前笔记上下文（可选）
+ * @param {Object} options - 请求选项
+ * @param {AbortSignal} options.signal - 中断信号
+ * @returns {ReadableStream} 流式响应
+ */
+export async function ragAgentStream(params, options = {}) {
+  const { question, top_k = 3, max_rounds = 3, note_context = null } = params;
+  const { signal } = options;
+
+  const response = await fetch(`${API_BASE_URL}/api/ai/rag/agent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ question, top_k, max_rounds, note_context }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.body;
+}
+
+/**
+ * 统一 Agent 接口
+ * 整合闲聊、RAG 知识检索、文档建议/编辑/格式化
+ * @param {Object} params - 请求参数
+ * @param {string} params.userInput - 用户输入
+ * @param {string} params.sessionId - 会话 ID
+ * @param {string} params.permissionMode - 权限模式 (assistant / editor)
+ * @param {string|null} params.documentContent - 文档内容
+ * @param {string|null} params.documentName - 文档名称
+ * @param {number} params.topK - 检索数量
+ * @param {number} params.maxRounds - 最大检索轮次
+ * @param {Object} options - 请求选项
+ * @param {AbortSignal} options.signal - 中断信号
+ * @returns {ReadableStream} 流式响应
+ */
+export async function unifiedAgentStream(params, options = {}) {
+  const {
+    userInput,
+    sessionId = '',
+    permissionMode = 'assistant',
+    documentContent = null,
+    documentName = null,
+    topK = 3,
+    maxRounds = 3,
+  } = params;
+  const { signal } = options;
+
+  const response = await fetch(`${API_BASE_URL}/api/ai/agent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      user_input: userInput,
+      session_id: sessionId,
+      permission_mode: permissionMode,
+      document_content: documentContent,
+      document_name: documentName,
+      top_k: topK,
+      max_rounds: maxRounds,
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+
+  return response.body;
 }
